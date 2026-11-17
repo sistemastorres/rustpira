@@ -96,9 +96,36 @@ fn idle_secs_between(now_ms: u32, last_input_ms: u32) -> u64 {
     u64::from(now_ms.wrapping_sub(last_input_ms)) / 1000
 }
 
+/// Whether the foreground window belongs to this process (any of the break
+/// screen windows, for example).
+pub fn foreground_is_ours() -> bool {
+    use windows_sys::Win32::System::Threading::GetCurrentProcessId;
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        GetForegroundWindow, GetWindowThreadProcessId,
+    };
+
+    // SAFETY: no preconditions; a null result means no foreground window.
+    let window = unsafe { GetForegroundWindow() };
+    if window.is_null() {
+        return false;
+    }
+    let mut process_id = 0u32;
+    // SAFETY: `window` is a window handle and `process_id` is a valid out pointer.
+    unsafe { GetWindowThreadProcessId(window, &mut process_id) };
+    // SAFETY: no preconditions.
+    process_id == unsafe { GetCurrentProcessId() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // `cargo test` runs without windows of its own, so the foreground window
+    // (the terminal or the editor) belongs to another process.
+    #[test]
+    fn foreground_window_of_another_process_is_not_ours() {
+        assert!(!foreground_is_ours());
+    }
 
     #[test]
     fn windows_day_of_week_starts_on_sunday() {

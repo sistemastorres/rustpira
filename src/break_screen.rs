@@ -8,12 +8,12 @@ use std::rc::Rc;
 
 use slint::ComponentHandle;
 use slint::winit_030::WinitWindowAccessor;
-use slint::winit_030::winit::window::WindowLevel;
 
 use crate::domain::config::{Background, Config};
 use crate::domain::engine::BreakView;
 use crate::platform::keyboard_block::KeyboardBlock;
 use crate::platform::monitors::monitors;
+use crate::platform::system;
 use crate::ui::BreakOverlay;
 
 pub struct BreakScreen {
@@ -87,27 +87,26 @@ impl BreakScreen {
         Ok(screen)
     }
 
-    /// Called every second: refreshes the countdown and buttons, and
-    /// re-asserts that the windows stay on top with the focus.
+    /// Called every second: refreshes the countdown and buttons, and takes
+    /// the focus back only when another application has it. winit's
+    /// `focus_window` simulates an Alt press to steal the foreground, so it
+    /// must not run while one of our windows already has it.
     pub fn update(&self, view: &BreakView) {
         let countdown = format!(
             "{:02}:{:02}",
             view.remaining_secs / 60,
             view.remaining_secs % 60
         );
+        let refocus = !system::foreground_is_ours();
         for window in &self.windows {
             window.set_countdown(countdown.clone().into());
             window.set_hard(view.hard);
             window.set_can_cancel(view.can_cancel);
             window.set_can_postpone(view.can_postpone);
             window.set_postpone_label(format!("Posponer {} min", view.postpone_minutes).into());
-            let primary = window.get_primary();
-            window.window().with_winit_window(|w| {
-                w.set_window_level(WindowLevel::AlwaysOnTop);
-                if primary {
-                    w.focus_window();
-                }
-            });
+            if refocus && window.get_primary() {
+                window.window().with_winit_window(|w| w.focus_window());
+            }
         }
     }
 }
