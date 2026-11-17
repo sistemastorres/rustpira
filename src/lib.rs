@@ -5,6 +5,7 @@
 
 pub mod domain {
     pub mod config;
+    pub mod timer;
 }
 
 pub mod storage {
