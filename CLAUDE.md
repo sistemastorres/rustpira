@@ -20,12 +20,16 @@ src/
   domain/      lógica pura: config, timer, reglas de descanso, tooltip
   platform/    adaptadores de Windows: bandeja, inactividad, energía/sesión,
                registro, gancho de teclado, sonido, notificaciones
+  storage/     lectura y escritura de archivos (config.toml, con .bak y escritura atómica)
   ui/          integración con Slint (ventanas)
 ui/            archivos .slint (vistas)
+examples/      pruebas técnicas ejecutables (spike_slint.rs: bandeja, overlay, RAM)
 recursos/      íconos (el PNG original es la fuente; no se incrusta)
 ```
 
-Las dependencias van hacia adentro: `ui` y `platform` usan `domain`; `domain` no usa a ninguno de los dos.
+Las dependencias van hacia adentro: `ui`, `platform` y `storage` usan `domain`; `domain` no usa a ninguno. Los módulos se declaran en `src/lib.rs`; `src/main.rs` solo arma la app.
+
+Renderizador de Slint: **solo `renderer-software`**. femtovg/OpenGL se midió en 529 MB y no libera memoria (ver `odd/tasks/rustpira-mvp.md`, L4).
 
 ## Comandos
 
