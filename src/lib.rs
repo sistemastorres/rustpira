@@ -16,6 +16,7 @@ pub mod storage {
 }
 
 pub mod platform {
+    pub mod autostart;
     pub mod keyboard_block;
     pub mod monitors;
     pub mod notify;
