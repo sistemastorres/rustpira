@@ -1,0 +1,65 @@
+// Notification-area icon with its context menu (design §5.1).
+// All state comes from the engine snapshot; callbacks go back to Rust.
+
+export component Tray inherits SystemTrayIcon {
+    in property <string> tip: "Rustpira";
+    in property <bool> settings-enabled: true;
+    in property <bool> disable-enabled: true;
+    in property <bool> quit-enabled: true;
+    in property <bool> show-reactivate: false;
+
+    callback open-settings();
+    callback disable-for(int);
+    callback reactivate();
+    callback about();
+    callback quit();
+
+    icon: @image-url("../recursos/rustpira-256.png");
+    tooltip: root.tip;
+
+    Menu {
+        MenuItem {
+            title: "Configuración";
+            enabled: root.settings-enabled;
+            activated => { root.open-settings(); }
+        }
+        Menu {
+            title: "Desactivar recordatorios";
+            enabled: root.disable-enabled;
+            MenuItem {
+                title: "15 minutos";
+                activated => { root.disable-for(15); }
+            }
+            MenuItem {
+                title: "30 minutos";
+                activated => { root.disable-for(30); }
+            }
+            MenuItem {
+                title: "1 hora";
+                activated => { root.disable-for(60); }
+            }
+            MenuItem {
+                title: "2 horas";
+                activated => { root.disable-for(120); }
+            }
+            MenuItem {
+                title: "4 horas";
+                activated => { root.disable-for(240); }
+            }
+        }
+        if root.show-reactivate: MenuItem {
+            title: "Reactivar ahora";
+            activated => { root.reactivate(); }
+        }
+        MenuSeparator { }
+        MenuItem {
+            title: "Acerca de";
+            activated => { root.about(); }
+        }
+        MenuItem {
+            title: "Salir";
+            enabled: root.quit-enabled;
+            activated => { root.quit(); }
+        }
+    }
+}
