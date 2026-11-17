@@ -105,11 +105,18 @@ pub fn load(path: &Path) -> Loaded {
 /// Writes the configuration atomically (temp file + rename), creating the
 /// parent directory if needed.
 pub fn save(path: &Path, config: &Config) -> io::Result<()> {
+    write_atomic(path, &config.to_toml())
+}
+
+/// Writes `contents` to a sibling temp file and renames it over `path`, so a
+/// crash or power loss never leaves a half-written file. Creates the parent
+/// directory if needed.
+pub(crate) fn write_atomic(path: &Path, contents: &str) -> io::Result<()> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;
     }
     let temp = sibling(path, "tmp");
-    std::fs::write(&temp, config.to_toml())?;
+    std::fs::write(&temp, contents)?;
     // On Windows, rename replaces an existing destination.
     std::fs::rename(&temp, path).inspect_err(|_| {
         let _ = std::fs::remove_file(&temp);

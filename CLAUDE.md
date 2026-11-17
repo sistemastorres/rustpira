@@ -20,7 +20,8 @@ src/
   domain/      lógica pura: config, timer, reglas de descanso, tooltip
   platform/    adaptadores de Windows: bandeja, inactividad, energía/sesión,
                registro, gancho de teclado, sonido, notificaciones
-  storage/     lectura y escritura de archivos (config.toml, con .bak y escritura atómica)
+  storage/     archivos en %APPDATA%\rustpira\: config.toml (preferencias, con .bak)
+               y state.toml (contador de cancelaciones); escritura atómica
   ui/          integración con Slint (ventanas)
 ui/            archivos .slint (vistas)
 examples/      pruebas técnicas ejecutables (spike_slint.rs: bandeja, overlay, RAM)
