@@ -32,3 +32,7 @@ pub mod ui {
 pub mod app;
 pub mod audio;
 pub mod break_screen;
+
+pub mod settings {
+    pub mod form;
+}

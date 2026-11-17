@@ -24,6 +24,7 @@ src/
                y state.toml (contador de cancelaciones); escritura atómica
   audio.rs     sonidos incluidos (sintetizados) y volumen de un .wav; puro, sin Windows
   break_screen.rs  pantalla de descanso: una ventana por monitor + bloqueo de teclado
+  settings/    ventana de configuración: form.rs (datos del formulario, puro) y window.rs (Slint)
   ui/          integración con Slint (ventanas)
 ui/            archivos .slint (vistas)
 examples/      pruebas técnicas ejecutables (spike_slint.rs: bandeja, overlay, RAM)
