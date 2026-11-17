@@ -29,8 +29,8 @@ Pronóstico: alrededor de 3500 líneas escritas en total. Ruta: todas inline; no
 
 | ID | Tarea | Specs | Ruta | Estado | Commit / evidencia |
 |---|---|---|---|---|---|
-| T0 | Base del repo: rama, `CLAUDE.md` (convenciones), `.gitignore`, `LICENSE` MIT, commit del diseño y los recursos | S14, S15 | inline | pendiente | — |
-| T1 | Prueba técnica de Slint (riesgos 1–4 de §8): overlay transparente y siempre encima en cada monitor, event loop sin ventanas junto a `tray-icon`, memoria liberada al cerrar ventanas, tema en tiempo de ejecución. Medición de RAM. El esqueleto que sirva queda como base | S1, S2, S9, S13 | inline | pendiente | — |
+| T0 | Base del repo: rama, `CLAUDE.md` (convenciones), `.gitignore`, `LICENSE` MIT, commit del diseño y los recursos | S14, S15 | inline | hecho | `d9ad0c9` |
+| T1 | Prueba técnica de Slint (riesgos 1–4 de §8): overlay transparente y siempre encima en cada monitor, event loop sin ventanas junto a `tray-icon`, memoria liberada al cerrar ventanas, tema en tiempo de ejecución. Medición de RAM. El esqueleto que sirva queda como base | S1, S2, S9, S13 | inline | hecho | ver L4–L5; commit en L5 |
 | T2 | Dominio: modelo de configuración, valores por defecto, validación (franjas horarias) y persistencia TOML con `.bak` si el archivo es inválido | S5–S8, S10–S13, S16 | inline | pendiente | — |
 | T3 | Dominio: máquina de estados del temporizador (intervalo, horarios, inactividad, desactivar por lapso, suspensión y bloqueo de sesión, reloj inyectado) | S5, S7, S12, S3 | inline | pendiente | — |
 | T4 | Dominio: reglas del descanso (cancelar, límite, bloqueo duro, posponer K por descanso, contador persistido) y textos del tooltip | S4, S10, S11 | inline | pendiente | — |
@@ -71,4 +71,13 @@ Pronóstico: alrededor de 3500 líneas escritas en total. Ruta: todas inline; no
   - Inactividad, posponer, foto de fondo, ícono e ícono en la ventana: citados en S12, S11, S9 y S15.
   - "que solo sea duro mientras esta en pantalla..."
 - **L3 (2026-11-16) — Decisiones:** se eligió Slint sin prueba previa. Diseño aprobado. Ícono: el original se conserva; `.ico` multitamaño (119 KB) y PNG de 256 px (105 KB) generados con System.Drawing. La revisión del diseño (builder check) planteó 4 preguntas: 3 se resolvieron como decisión del diseñador en §5.2, §5.3 y §8, y 1 la decidió el usuario (S10, alcance del bloqueo duro).
-- **Siguiente paso:** T0.
+- **L4 (2026-11-16) — T1, evidencia de la prueba técnica** (`examples/spike_slint.rs`, Slint 1.19.0, release, 1 monitor):
+  - Slint 1.19 trae su propio `SystemTrayIcon`, con tooltip reactivo, submenús y `enabled`. No hace falta el crate `tray-icon` (cambio respecto del diseño §6, con menos dependencias).
+  - Memoria, renderizador **software** (`SPIKE_AUTO=1`): solo bandeja, 2,6 MB privados (13,5 MB de working set); descanso abierto, 17,5 MB privados (35,2 MB WS); después de cerrarlo, 3,5 MB privados; con la configuración abierta en tema oscuro, 4,5 MB; tras cerrar la configuración y hacer 3 descansos más, 3,6 MB, estable y sin fugas. Riesgo 3 de §8 resuelto: la memoria se libera.
+  - Memoria, renderizador **femtovg** (OpenGL): 529 MB privados con el descanso abierto y 320 MB que no se liberan. Se descarta: el feature `renderer-femtovg` se quitó de `Cargo.toml`.
+  - Riesgo 2 de §8 resuelto: `run_event_loop_until_quit` mantiene viva la app sin ventanas.
+  - Riesgo 4 de §8: el cambio de tema por código (`Palette.color-scheme`) no da errores. Falta confirmarlo visualmente.
+  - Riesgo 1 de §8: la ventana sin bordes, siempre encima, con fondo `#1e3a5fcc` y sin aparecer en la barra de tareas se crea sin errores. Falta confirmar visualmente la transparencia. El caso de varios monitores no se pudo probar porque el equipo tiene uno solo.
+  - Ejecutable de prueba: 12,9 MB, sin optimizar el tamaño (queda para T9).
+- **L5 (2026-11-16) — T1, verificación visual del usuario, textual:** "Todo ok, probe cada punto y funciona todo bien, incluso con 2 monitores (prendi y active mi 2° monitor y se pone azul tb)". Quedan confirmados los riesgos 1 (transparencia, siempre encima, sin barra de tareas, **2 monitores**) y 4 (tema en vivo), además del menú, el tooltip y los ítems deshabilitados durante el descanso. Checks: `cargo fmt --check` ok; `cargo clippy --all-targets --release -- -D warnings` ok (solo avisa `unused dependency slint` en el binario principal, que se resuelve en T5); `cargo test` ok (0 tests).
+- **Siguiente paso:** T2.
