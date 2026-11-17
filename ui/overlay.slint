@@ -1,0 +1,94 @@
+// Break screen (design §5.3). One instance per monitor; only the one on the
+// primary monitor shows the content. Color or image share one opacity.
+
+import { Button } from "std-widgets.slint";
+
+export component BreakOverlay inherits Window {
+    in property <bool> primary: false;
+    in property <color> bg-color: #1e3a5f;
+    in property <image> bg-image;
+    in property <bool> show-image: false;
+    in property <float> layer-opacity: 0.8;
+    in property <string> heading;
+    in property <string> message;
+    in property <string> countdown: "05:00";
+    in property <bool> hard: false;
+    in property <bool> can-cancel: false;
+    in property <bool> can-postpone: false;
+    in property <string> postpone-label;
+
+    callback cancel();
+    callback postpone();
+
+    title: "Rustpira - descanso";
+    icon: @image-url("../recursos/rustpira-256.png");
+    no-frame: true;
+    always-on-top: true;
+    background: transparent;
+
+    if !root.show-image: Rectangle {
+        background: root.bg-color.with-alpha(root.layer-opacity);
+    }
+    if root.show-image: Image {
+        width: parent.width;
+        height: parent.height;
+        source: root.bg-image;
+        image-fit: cover;
+        opacity: root.layer-opacity;
+    }
+
+    if root.primary: VerticalLayout {
+        alignment: center;
+        spacing: 20px;
+        padding: 40px;
+
+        HorizontalLayout {
+            alignment: center;
+            Image {
+                source: @image-url("../recursos/rustpira-256.png");
+                width: 128px;
+                height: 128px;
+            }
+        }
+        Text {
+            text: root.heading;
+            font-size: 44px;
+            font-weight: 700;
+            color: white;
+            horizontal-alignment: center;
+            wrap: word-wrap;
+        }
+        Text {
+            text: root.message;
+            font-size: 22px;
+            color: white;
+            horizontal-alignment: center;
+            wrap: word-wrap;
+        }
+        Text {
+            text: root.countdown;
+            font-size: 80px;
+            font-weight: 300;
+            color: white;
+            horizontal-alignment: center;
+        }
+        if root.hard: Text {
+            text: "Descanso obligatorio: no se puede cancelar ni posponer.";
+            font-size: 16px;
+            color: #ffffffcc;
+            horizontal-alignment: center;
+        }
+        HorizontalLayout {
+            alignment: center;
+            spacing: 16px;
+            if root.can-postpone: Button {
+                text: root.postpone-label;
+                clicked => { root.postpone(); }
+            }
+            if root.can-cancel: Button {
+                text: "Cancelar descanso";
+                clicked => { root.cancel(); }
+            }
+        }
+    }
+}

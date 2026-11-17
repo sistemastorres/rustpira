@@ -1,15 +1,16 @@
 //! Wires the domain engine to Windows and the Slint UI: loads the files,
-//! ticks the engine once per second, mirrors its snapshot into the tray, and
-//! routes menu actions back to it.
+//! ticks the engine once per second, mirrors its snapshot into the tray and
+//! the break screen, and routes menu and button actions back to it.
 
 use std::cell::{Cell, RefCell};
 use std::error::Error;
 use std::path::PathBuf;
-use std::rc::Rc;
+use std::rc::{Rc, Weak};
 use std::time::Duration;
 
+use crate::break_screen::BreakScreen;
 use crate::domain::config::Config;
-use crate::domain::engine::{Effect, Engine};
+use crate::domain::engine::{BreakView, Effect, Engine};
 use crate::platform::single_instance::{self, Instance, SingleInstance};
 use crate::platform::system;
 use crate::storage::{config_store, state_store};
@@ -22,6 +23,8 @@ struct App {
     state_path: PathBuf,
     instance: SingleInstance,
     session_locked: Cell<bool>,
+    break_screen: RefCell<Option<BreakScreen>>,
+    this: Weak<App>,
 }
 
 /// Runs the application until "Salir".
@@ -39,13 +42,16 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         eprintln!("[rustpira] {warning}");
     }
 
-    let app = Rc::new(App {
-        tray: Tray::new()?,
+    let tray = Tray::new()?;
+    let app = Rc::new_cyclic(|this| App {
+        tray,
         engine: RefCell::new(Engine::new(state_store::load_cancels(&state_path))),
         config: RefCell::new(loaded.config),
         state_path,
         instance,
         session_locked: Cell::new(false),
+        break_screen: RefCell::new(None),
+        this: this.clone(),
     });
     wire_tray(&app);
     app.tick();
@@ -139,7 +145,8 @@ impl App {
         self.refresh();
     }
 
-    /// Mirrors the engine snapshot into the tray icon and menu.
+    /// Mirrors the engine snapshot into the tray icon, the menu and the
+    /// break screen (opened, updated or closed to match).
     fn refresh(&self) {
         let snapshot = {
             let config = self.config.borrow();
@@ -151,6 +158,58 @@ impl App {
         self.tray.set_disable_enabled(snapshot.menu.disable_enabled);
         self.tray.set_quit_enabled(snapshot.menu.quit_enabled);
         self.tray.set_show_reactivate(snapshot.menu.show_reactivate);
+        self.sync_break_screen(snapshot.break_view);
+    }
+
+    fn sync_break_screen(&self, view: Option<BreakView>) {
+        let mut screen = self.break_screen.borrow_mut();
+        match (view, screen.as_ref()) {
+            (Some(view), Some(open)) => open.update(&view),
+            (Some(view), None) => {
+                let config = self.config.borrow();
+                let cancel = self.deferred(App::cancel_break);
+                let postpone = self.deferred(App::postpone_break);
+                match BreakScreen::open(&config, &view, cancel, postpone) {
+                    Ok(opened) => *screen = Some(opened),
+                    Err(e) => eprintln!("[rustpira] no se pudo abrir la pantalla de descanso: {e}"),
+                }
+            }
+            // Dropping the screen releases its windows, image and hook.
+            (None, Some(_)) => *screen = None,
+            (None, None) => {}
+        }
+    }
+
+    /// Wraps a button action so it runs on the next event-loop turn: the
+    /// action may close the very window whose callback is running.
+    fn deferred(&self, action: fn(&App)) -> Rc<dyn Fn()> {
+        let weak = self.this.clone();
+        Rc::new(move || {
+            let weak = weak.clone();
+            slint::Timer::single_shot(Duration::ZERO, move || {
+                if let Some(app) = weak.upgrade() {
+                    action(&app);
+                }
+            });
+        })
+    }
+
+    fn cancel_break(&self) {
+        let effects = {
+            let config = self.config.borrow();
+            self.engine.borrow_mut().cancel(&config)
+        };
+        self.apply(&effects);
+        self.refresh();
+    }
+
+    fn postpone_break(&self) {
+        let effects = {
+            let config = self.config.borrow();
+            self.engine.borrow_mut().postpone(&config, system::now())
+        };
+        self.apply(&effects);
+        self.refresh();
     }
 
     fn apply(&self, effects: &[Effect]) {
@@ -161,7 +220,8 @@ impl App {
                         eprintln!("[rustpira] no se pudo guardar el contador: {e}");
                     }
                 }
-                // T6 shows/hides the break screen; T7 plays sounds and notifies.
+                // The break screen follows the snapshot (see `refresh`);
+                // T7 plays the sounds and shows the notification.
                 Effect::BreakStarted => eprintln!("[rustpira] descanso: empieza"),
                 Effect::BreakEnded { completed } => {
                     eprintln!("[rustpira] descanso: termina (completo: {completed})");
