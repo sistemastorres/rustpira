@@ -37,4 +37,5 @@ pub mod break_screen;
 
 pub mod settings {
     pub mod form;
+    pub mod window;
 }

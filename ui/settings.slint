@@ -1,0 +1,423 @@
+// Settings window (design §5.7). Rust fills every property from the saved
+// configuration, reads them back on "Guardar" and validates
+// (`settings::form`). Created when opened, destroyed when closed.
+
+import {
+    Button, CheckBox, ComboBox, LineEdit, Palette, ScrollView, Slider, SpinBox, TabWidget,
+    TextEdit, GroupBox,
+} from "std-widgets.slint";
+
+export struct SlotRow {
+    start: string,
+    end: string,
+}
+
+export struct DayRow {
+    name: string,
+    slots: [SlotRow],
+}
+
+component Label inherits Text {
+    vertical-alignment: center;
+    min-width: 200px;
+}
+
+component Hint inherits Text {
+    font-size: 12px;
+    color: Palette.foreground.with-alpha(0.65);
+    wrap: word-wrap;
+}
+
+export component Settings inherits Window {
+    // General
+    in-out property <int> interval-minutes;
+    in-out property <int> break-minutes;
+    in-out property <int> notice-index; // 0 = bloqueo, 1 = notificación
+    in-out property <bool> start-with-windows;
+    // Mensaje
+    in-out property <string> heading;
+    in-out property <string> message;
+    // Horarios
+    in property <[DayRow]> days;
+    // Descanso
+    in-out property <bool> allow-cancel;
+    in-out property <bool> limit-cancels;
+    in-out property <int> cancel-limit;
+    in-out property <int> postpone-minutes;
+    in-out property <int> max-postpones;
+    in-out property <bool> idle-enabled;
+    in-out property <int> idle-minutes;
+    // Apariencia
+    in-out property <int> background-index; // 0 = color, 1 = imagen
+    in-out property <string> color-text;
+    in property <color> color-preview;
+    in-out property <string> image-path;
+    in-out property <float> layer-opacity;
+    in-out property <int> theme-index; // 0 = claro, 1 = oscuro
+    // Sonido
+    in property <[string]> sound-names;
+    in-out property <int> sound-index;
+    in property <int> custom-sound-index;
+    in-out property <string> custom-sound-path;
+    in-out property <float> volume;
+    in-out property <bool> end-sound;
+    // Footer
+    in property <string> error;
+
+    callback save();
+    callback cancel();
+    callback test-sound();
+    callback pick-image();
+    callback pick-sound();
+    callback pick-color();
+    callback color-edited(string);
+    callback add-slot(int);
+    callback remove-slot(int, int);
+    callback copy-to-weekdays(int);
+    callback start-edited(int, int, string);
+    callback end-edited(int, int, string);
+
+    title: "Rustpira - Configuración";
+    icon: @image-url("../recursos/rustpira-256.png");
+    preferred-width: 680px;
+    preferred-height: 600px;
+    min-width: 560px;
+    min-height: 480px;
+
+    init => {
+        Palette.color-scheme = root.theme-index == 1 ? ColorScheme.dark : ColorScheme.light;
+    }
+    changed theme-index => {
+        Palette.color-scheme = root.theme-index == 1 ? ColorScheme.dark : ColorScheme.light;
+    }
+
+    VerticalLayout {
+        padding: 12px;
+        spacing: 10px;
+
+        TabWidget {
+            vertical-stretch: 1;
+
+            Tab {
+                title: "General";
+                VerticalLayout {
+                    alignment: start;
+                    padding: 16px;
+                    spacing: 12px;
+                    HorizontalLayout {
+                        Label { text: "Intervalo entre descansos (min)"; }
+                        SpinBox {
+                            minimum: 1;
+                            maximum: 240;
+                            value <=> root.interval-minutes;
+                        }
+                    }
+                    HorizontalLayout {
+                        Label { text: "Duración del descanso (min)"; }
+                        SpinBox {
+                            minimum: 1;
+                            maximum: 60;
+                            value <=> root.break-minutes;
+                        }
+                    }
+                    HorizontalLayout {
+                        Label { text: "Tipo de aviso"; }
+                        ComboBox {
+                            model: ["Pantalla completa (bloquea todo)", "Solo notificación"];
+                            current-index <=> root.notice-index;
+                        }
+                    }
+                    CheckBox {
+                        text: "Iniciar con Windows";
+                        checked <=> root.start-with-windows;
+                    }
+                }
+            }
+
+            Tab {
+                title: "Mensaje";
+                VerticalLayout {
+                    padding: 16px;
+                    spacing: 8px;
+                    Text { text: "Título"; }
+                    LineEdit { text <=> root.heading; }
+                    Text { text: "Mensaje"; }
+                    TextEdit {
+                        text <=> root.message;
+                        vertical-stretch: 1;
+                    }
+                    Hint { text: "Cada línea del mensaje se muestra en un renglón aparte."; }
+                }
+            }
+
+            Tab {
+                title: "Horarios";
+                VerticalLayout {
+                    padding: 8px;
+                    spacing: 6px;
+                    Hint {
+                        text: "Franjas con formato HH:MM. Un día sin franjas no tiene avisos.";
+                    }
+                    ScrollView {
+                        vertical-stretch: 1;
+                        VerticalLayout {
+                            padding-right: 12px;
+                            spacing: 10px;
+                            for day[d] in root.days: VerticalLayout {
+                                spacing: 4px;
+                                HorizontalLayout {
+                                    spacing: 8px;
+                                    Text {
+                                        text: day.name;
+                                        font-weight: 700;
+                                        vertical-alignment: center;
+                                        min-width: 90px;
+                                    }
+                                    Button {
+                                        text: "Agregar franja";
+                                        clicked => { root.add-slot(d); }
+                                    }
+                                    Button {
+                                        text: "Copiar a todos los días hábiles";
+                                        clicked => { root.copy-to-weekdays(d); }
+                                    }
+                                }
+                                if day.slots.length == 0: Hint { text: "Sin franjas: no hay avisos este día."; }
+                                for slot[s] in day.slots: HorizontalLayout {
+                                    spacing: 8px;
+                                    padding-left: 90px;
+                                    alignment: start;
+                                    LineEdit {
+                                        width: 80px;
+                                        text: slot.start;
+                                        edited(text) => { root.start-edited(d, s, text); }
+                                    }
+                                    Text { text: "a"; vertical-alignment: center; }
+                                    LineEdit {
+                                        width: 80px;
+                                        text: slot.end;
+                                        edited(text) => { root.end-edited(d, s, text); }
+                                    }
+                                    Button {
+                                        text: "Quitar";
+                                        clicked => { root.remove-slot(d, s); }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Tab {
+                title: "Descanso";
+                VerticalLayout {
+                    alignment: start;
+                    padding: 16px;
+                    spacing: 12px;
+                    CheckBox {
+                        text: "Permitir cancelar el descanso";
+                        checked <=> root.allow-cancel;
+                    }
+                    CheckBox {
+                        text: "Limitar las cancelaciones seguidas";
+                        enabled: root.allow-cancel;
+                        checked <=> root.limit-cancels;
+                    }
+                    HorizontalLayout {
+                        Label { text: "Cancelaciones seguidas permitidas"; }
+                        SpinBox {
+                            enabled: root.allow-cancel && root.limit-cancels;
+                            minimum: 1;
+                            maximum: 10;
+                            value <=> root.cancel-limit;
+                        }
+                    }
+                    Hint {
+                        text: "Al llegar al límite, el próximo descanso es obligatorio: se muestra sin botones hasta que termina.";
+                    }
+                    HorizontalLayout {
+                        Label { text: "Posponer (min)"; }
+                        SpinBox {
+                            minimum: 1;
+                            maximum: 30;
+                            value <=> root.postpone-minutes;
+                        }
+                    }
+                    HorizontalLayout {
+                        Label { text: "Posponer hasta (veces por descanso)"; }
+                        SpinBox {
+                            minimum: 0;
+                            maximum: 3;
+                            value <=> root.max-postpones;
+                        }
+                    }
+                    CheckBox {
+                        text: "Pausar el contador por inactividad";
+                        checked <=> root.idle-enabled;
+                    }
+                    HorizontalLayout {
+                        Label { text: "Minutos sin actividad"; }
+                        SpinBox {
+                            enabled: root.idle-enabled;
+                            minimum: 1;
+                            maximum: 120;
+                            value <=> root.idle-minutes;
+                        }
+                    }
+                    Hint {
+                        text: "Si no usa el teclado ni el mouse durante ese tiempo, el contador se detiene y vuelve a empezar al detectar actividad.";
+                    }
+                }
+            }
+
+            Tab {
+                title: "Apariencia";
+                VerticalLayout {
+                    alignment: start;
+                    padding: 16px;
+                    spacing: 12px;
+                    HorizontalLayout {
+                        Label { text: "Fondo del descanso"; }
+                        ComboBox {
+                            model: ["Color", "Imagen"];
+                            current-index <=> root.background-index;
+                        }
+                    }
+                    HorizontalLayout {
+                        spacing: 8px;
+                        Label { text: "Color"; }
+                        Rectangle {
+                            width: 32px;
+                            height: 32px;
+                            border-radius: 4px;
+                            border-width: 1px;
+                            border-color: Palette.border;
+                            background: root.color-preview;
+                        }
+                        LineEdit {
+                            width: 110px;
+                            text <=> root.color-text;
+                            edited(text) => { root.color-edited(text); }
+                        }
+                        Button {
+                            text: "Elegir…";
+                            clicked => { root.pick-color(); }
+                        }
+                    }
+                    Hint { text: "El color también se usa si la imagen no se puede cargar."; }
+                    HorizontalLayout {
+                        spacing: 8px;
+                        Label { text: "Imagen (PNG o JPG)"; }
+                        LineEdit {
+                            enabled: root.background-index == 1;
+                            text <=> root.image-path;
+                        }
+                        Button {
+                            enabled: root.background-index == 1;
+                            text: "Examinar…";
+                            clicked => { root.pick-image(); }
+                        }
+                    }
+                    HorizontalLayout {
+                        spacing: 8px;
+                        Label { text: "Opacidad"; }
+                        Slider {
+                            minimum: 0;
+                            maximum: 100;
+                            step: 1;
+                            value <=> root.layer-opacity;
+                        }
+                        Text {
+                            text: "\{Math.round(root.layer-opacity)} %";
+                            vertical-alignment: center;
+                            min-width: 48px;
+                        }
+                    }
+                    HorizontalLayout {
+                        Label { text: "Tema de esta ventana"; }
+                        ComboBox {
+                            model: ["Claro", "Oscuro"];
+                            current-index <=> root.theme-index;
+                        }
+                    }
+                }
+            }
+
+            Tab {
+                title: "Sonido";
+                VerticalLayout {
+                    alignment: start;
+                    padding: 16px;
+                    spacing: 12px;
+                    HorizontalLayout {
+                        Label { text: "Sonido"; }
+                        ComboBox {
+                            model: root.sound-names;
+                            current-index <=> root.sound-index;
+                        }
+                    }
+                    HorizontalLayout {
+                        spacing: 8px;
+                        Label { text: "Archivo propio (.wav)"; }
+                        LineEdit {
+                            enabled: root.sound-index == root.custom-sound-index;
+                            text <=> root.custom-sound-path;
+                        }
+                        Button {
+                            enabled: root.sound-index == root.custom-sound-index;
+                            text: "Examinar…";
+                            clicked => { root.pick-sound(); }
+                        }
+                    }
+                    HorizontalLayout {
+                        spacing: 8px;
+                        Label { text: "Volumen"; }
+                        Slider {
+                            minimum: 0;
+                            maximum: 100;
+                            step: 1;
+                            value <=> root.volume;
+                        }
+                        Text {
+                            text: "\{Math.round(root.volume)} %";
+                            vertical-alignment: center;
+                            min-width: 48px;
+                        }
+                    }
+                    CheckBox {
+                        text: "Sonar también al terminar el descanso";
+                        checked <=> root.end-sound;
+                    }
+                    HorizontalLayout {
+                        alignment: start;
+                        Button {
+                            text: "Probar";
+                            clicked => { root.test-sound(); }
+                        }
+                    }
+                }
+            }
+        }
+
+        HorizontalLayout {
+            spacing: 8px;
+            Text {
+                text: root.error;
+                color: #c42b1c;
+                wrap: word-wrap;
+                vertical-alignment: center;
+                horizontal-stretch: 1;
+            }
+            Button {
+                text: "Guardar";
+                primary: true;
+                clicked => { root.save(); }
+            }
+            Button {
+                text: "Cancelar";
+                clicked => { root.cancel(); }
+            }
+        }
+    }
+}

@@ -11,10 +11,12 @@ use std::time::Duration;
 use crate::break_screen::BreakScreen;
 use crate::domain::config::Config;
 use crate::domain::engine::{BreakView, Effect, Engine};
+use crate::platform::autostart;
 use crate::platform::notify;
 use crate::platform::single_instance::{self, Instance, SingleInstance};
 use crate::platform::sound::Player;
 use crate::platform::system;
+use crate::settings::window::{Hooks, SettingsWindow};
 use crate::storage::{config_store, state_store};
 use crate::ui::Tray;
 
@@ -26,6 +28,8 @@ struct App {
     instance: SingleInstance,
     session_locked: Cell<bool>,
     break_screen: RefCell<Option<BreakScreen>>,
+    settings: RefCell<Option<SettingsWindow>>,
+    config_path: PathBuf,
     player: Player,
     this: Weak<App>,
 }
@@ -47,6 +51,12 @@ pub fn run() -> Result<(), Box<dyn Error>> {
     let config_path = config_store::default_path().ok_or("la variable APPDATA no está definida")?;
     let state_path = state_store::default_path().ok_or("la variable APPDATA no está definida")?;
     let loaded = config_store::load(&config_path);
+    if loaded.config.start_with_windows {
+        // Keeps the Run entry pointing at this exe if the portable exe moved.
+        if let Err(e) = autostart::set(true) {
+            eprintln!("[rustpira] {e}");
+        }
+    }
 
     let tray = Tray::new()?;
     let app = Rc::new_cyclic(|this| App {
@@ -57,6 +67,8 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         instance,
         session_locked: Cell::new(false),
         break_screen: RefCell::new(None),
+        settings: RefCell::new(None),
+        config_path,
         player: Player::new(),
         this: this.clone(),
     });
@@ -251,8 +263,62 @@ impl App {
         }
     }
 
+    /// Opens the settings window, or brings it to the front if it is open.
+    /// Never during a break: that would be a way around the hard lock.
     fn open_settings(&self) {
-        // T8: settings window.
-        eprintln!("[rustpira] configuración: pendiente (T8)");
+        let allowed = {
+            let config = self.config.borrow();
+            let engine = self.engine.borrow();
+            engine
+                .snapshot(&config, system::now())
+                .menu
+                .settings_enabled
+        };
+        if !allowed {
+            return;
+        }
+        if let Some(open) = self.settings.borrow().as_ref() {
+            open.bring_to_front();
+            return;
+        }
+
+        let (save, test, close) = (self.this.clone(), self.this.clone(), self.this.clone());
+        let hooks = Hooks {
+            save: Box::new(move |config| match save.upgrade() {
+                Some(app) => app.save_settings(config),
+                None => Ok(()),
+            }),
+            test_sound: Box::new(move |sound| {
+                if let Some(app) = test.upgrade() {
+                    app.player.play(sound);
+                }
+            }),
+            close: Box::new(move || {
+                let close = close.clone();
+                // Dropped on the next turn: this runs inside the window's own callback.
+                slint::Timer::single_shot(Duration::ZERO, move || {
+                    if let Some(app) = close.upgrade() {
+                        app.settings.borrow_mut().take();
+                    }
+                });
+            }),
+        };
+        let opened = SettingsWindow::open(&self.config.borrow(), hooks);
+        match opened {
+            Ok(window) => *self.settings.borrow_mut() = Some(window),
+            Err(e) => eprintln!("[rustpira] no se pudo abrir la configuración: {e}"),
+        }
+    }
+
+    /// Persists and applies a validated configuration from the settings
+    /// window. The counter restarts (design §5.2).
+    fn save_settings(&self, config: Config) -> Result<(), String> {
+        config_store::save(&self.config_path, &config)
+            .map_err(|e| format!("No se pudo guardar la configuración: {e}"))?;
+        let autostart = autostart::set(config.start_with_windows);
+        *self.config.borrow_mut() = config;
+        self.engine.borrow_mut().config_changed();
+        self.refresh();
+        autostart.map_err(|e| format!("Se guardó la configuración, pero {e}."))
     }
 }
