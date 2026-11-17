@@ -272,6 +272,9 @@ impl Default for IdleConfig {
     }
 }
 
+/// How many built-in sounds exist (`SoundConfig::builtin` is 1-based).
+pub const BUILTIN_SOUNDS: u8 = 4;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SoundSource {
@@ -444,7 +447,7 @@ impl std::error::Error for ConfigError {}
 impl Config {
     /// Checks every rule; returns the first violation found.
     pub fn validate(&self) -> Result<(), ConfigError> {
-        let ranges: [(&'static str, u32, u32, u32); 8] = [
+        let ranges: [(&'static str, u32, u32, u32); 9] = [
             ("Intervalo (min)", self.interval_minutes, 1, 240),
             ("Duración del descanso (min)", self.break_minutes, 1, 60),
             (
@@ -461,6 +464,12 @@ impl Config {
                 3,
             ),
             ("Inactividad (min)", self.idle.minutes, 1, 120),
+            (
+                "Sonido incluido",
+                self.sound.builtin.into(),
+                1,
+                BUILTIN_SOUNDS.into(),
+            ),
             ("Volumen", self.sound.volume.into(), 0, 100),
             ("Opacidad", self.appearance.opacity.into(), 0, 100),
         ];
@@ -616,7 +625,7 @@ mod tests {
     #[test]
     fn numeric_settings_are_range_checked() {
         type Mutation = fn(&mut Config);
-        let cases: [(Mutation, &str); 8] = [
+        let cases: [(Mutation, &str); 10] = [
             (|c| c.interval_minutes = 0, "Intervalo (min)"),
             (|c| c.break_minutes = 0, "Duración del descanso (min)"),
             (|c| c.breaks.cancel_limit = 0, "Cancelaciones seguidas"),
@@ -625,6 +634,8 @@ mod tests {
             (|c| c.sound.volume = 101, "Volumen"),
             (|c| c.appearance.opacity = 101, "Opacidad"),
             (|c| c.interval_minutes = 241, "Intervalo (min)"),
+            (|c| c.sound.builtin = 0, "Sonido incluido"),
+            (|c| c.sound.builtin = 5, "Sonido incluido"),
         ];
         for (break_it, field) in cases {
             let mut c = Config::default();

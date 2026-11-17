@@ -11,7 +11,9 @@ use std::time::Duration;
 use crate::break_screen::BreakScreen;
 use crate::domain::config::Config;
 use crate::domain::engine::{BreakView, Effect, Engine};
+use crate::platform::notify;
 use crate::platform::single_instance::{self, Instance, SingleInstance};
+use crate::platform::sound::Player;
 use crate::platform::system;
 use crate::storage::{config_store, state_store};
 use crate::ui::Tray;
@@ -24,7 +26,15 @@ struct App {
     instance: SingleInstance,
     session_locked: Cell<bool>,
     break_screen: RefCell<Option<BreakScreen>>,
+    player: Player,
     this: Weak<App>,
+}
+
+/// Shows a Windows notification; if that is not possible, logs the text.
+fn notify_or_log(title: &str, message: &str) {
+    if !notify::show(title, message) {
+        eprintln!("[rustpira] no se pudo mostrar la notificación: {title}: {message}");
+    }
 }
 
 /// Runs the application until "Salir".
@@ -37,10 +47,6 @@ pub fn run() -> Result<(), Box<dyn Error>> {
     let config_path = config_store::default_path().ok_or("la variable APPDATA no está definida")?;
     let state_path = state_store::default_path().ok_or("la variable APPDATA no está definida")?;
     let loaded = config_store::load(&config_path);
-    if let Some(warning) = &loaded.warning {
-        // T7 shows this as a Windows notification.
-        eprintln!("[rustpira] {warning}");
-    }
 
     let tray = Tray::new()?;
     let app = Rc::new_cyclic(|this| App {
@@ -51,11 +57,19 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         instance,
         session_locked: Cell::new(false),
         break_screen: RefCell::new(None),
+        player: Player::new(),
         this: this.clone(),
     });
     wire_tray(&app);
     app.tick();
     app.tray.show()?;
+
+    if let Some(warning) = loaded.warning {
+        // Give the tray icon a moment to register before notifying.
+        slint::Timer::single_shot(Duration::from_secs(1), move || {
+            notify_or_log("Rustpira: configuración", &warning.to_string());
+        });
+    }
 
     let timer = slint::Timer::default();
     let weak = Rc::downgrade(&app);
@@ -220,13 +234,19 @@ impl App {
                         eprintln!("[rustpira] no se pudo guardar el contador: {e}");
                     }
                 }
-                // The break screen follows the snapshot (see `refresh`);
-                // T7 plays the sounds and shows the notification.
-                Effect::BreakStarted => eprintln!("[rustpira] descanso: empieza"),
+                // The break screen itself follows the snapshot (see `refresh`).
+                Effect::BreakStarted => self.player.play(&self.config.borrow().sound),
                 Effect::BreakEnded { completed } => {
-                    eprintln!("[rustpira] descanso: termina (completo: {completed})");
+                    let config = self.config.borrow();
+                    if *completed && config.sound.end_sound {
+                        self.player.play(&config.sound);
+                    }
                 }
-                Effect::ShowNotification => eprintln!("[rustpira] notificación (T7)"),
+                Effect::ShowNotification => {
+                    let config = self.config.borrow();
+                    notify_or_log(&config.message.title, &config.message.body);
+                    self.player.play(&config.sound);
+                }
             }
         }
     }

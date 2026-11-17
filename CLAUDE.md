@@ -22,6 +22,8 @@ src/
                registro, gancho de teclado, sonido, notificaciones
   storage/     archivos en %APPDATA%\rustpira\: config.toml (preferencias, con .bak)
                y state.toml (contador de cancelaciones); escritura atómica
+  audio.rs     sonidos incluidos (sintetizados) y volumen de un .wav; puro, sin Windows
+  break_screen.rs  pantalla de descanso: una ventana por monitor + bloqueo de teclado
   ui/          integración con Slint (ventanas)
 ui/            archivos .slint (vistas)
 examples/      pruebas técnicas ejecutables (spike_slint.rs: bandeja, overlay, RAM)

@@ -18,7 +18,9 @@ pub mod storage {
 pub mod platform {
     pub mod keyboard_block;
     pub mod monitors;
+    pub mod notify;
     pub mod single_instance;
+    pub mod sound;
     pub mod system;
 }
 
@@ -28,4 +30,5 @@ pub mod ui {
 }
 
 pub mod app;
+pub mod audio;
 pub mod break_screen;
