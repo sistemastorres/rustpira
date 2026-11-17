@@ -1,0 +1,74 @@
+# Rustpira MVP — recordatorio de descansos residente para Windows 10/11
+
+Objetivo: primera versión completa de Rustpira según el diseño aprobado en `docs/superpowers/specs/2026-11-16-rustpira-design.md`. Rama: `feat/rustpira-mvp`. Estrategia de entrega: `exception-ok`, porque el repositorio es personal, nuevo, sin remoto ni revisores, y el usuario puede cambiarla. Runner de tests: `cargo test` (más `cargo clippy -- -D warnings` y `cargo fmt --check`).
+
+## Specs
+
+Cada spec cita textualmente al usuario. El detalle de comportamiento y criterios de aceptación está en la sección del diseño aprobado indicada como "Diseño §x". El usuario aprobó el diseño completo ("diseño aprobado.").
+
+- **S1 — Plataforma y RAM.** "Debe correr en windows 10/11 optmizando el uso de ram." Además: "si si slint directo, justamente lo q no me gusta de breaktimer es el consumo de memoria porque esta hecho en electron." Interfaz con Slint. Diseño §3, §4, §7 (metas de RAM medidas y reportadas), §8.
+- **S2 — App residente.** "Duedar activa en la area de notificaciones como cualquier app residente." Diseño §5.1.
+- **S3 — Menú contextual.** "Con boton derecho del mouse en el icono, apareceran las opciones: Configuracion, Desactivar recordatorios, Acerca de y Salir. En ela opcion Desactivar mostrara una lista de opciones  que seran lapsos de tiempos, 15m, 30m, 1h, 2h, 4h." También: "podemos bloquear el desactivar del menu contextual durante cada bloqueo ya sea normal o duro." Diseño §5.1 (también se deshabilitan Configuración y Salir durante el descanso; opción "Reactivar ahora").
+- **S4 — Tooltip.** "Cuando el cursor este sobre el icono de la app que muetre un tooltip con un mensaje tipo "Siguiente descanso en hh:mm:ss"" Diseño §5.1 (textos según estado).
+- **S5 — Intervalo, tipo de aviso y arranque.** "Configurar cada cuantos minutos aparecera el aviso, tipo de aviso (bloqueo general o notificacion unicamente). Tambien configurar si se quiere que se cargue al iniciar windows." Diseño §5.2, §5.3, §5.7. Incluye la duración del descanso.
+- **S6 — Título y mensaje.** "configurar el titulo de la ventana y un mensaje de n lineas qua apareceran" Diseño §5.3, §5.7.
+- **S7 — Horarios de trabajo.** "Por cada dia de la semana se debe poder elegir n lapos de tiempo durante los cuales la app trabajara y avisará.... Seran los horarios de trabajo." Diseño §5.5.
+- **S8 — Sonido.** "Tambien se debe poder configurar un sonido y el volumen del mismo, que aparecera cuando avise." Diseño §5.6.
+- **S9 — Bloqueo de pantalla completa.** "Cuando avisa de tomarse un descanso, debe quedar sobreo todo lo q existe abierto, y bloquear todo acceso a cualquier cosa abierta y opcionalmente tendra un boton de cancelar descanso." Y: "Cuando el bloqueo es pantalla completa, la idea es igual q breaktimer, que te permite elegir un color y te pinta toda la pantalla de ese color con un grado de transparencia configurable." Y: "que opcionalmente a poner la pantalla a un color elegido, poder poner una foto q elija el usuario y ademas si es viable q respete la transparencia configurada. La transparecia sera una sola tanto para si es foto o color." Y: "cuando aparezca la ventana de aviso, q muestre tb el icono en la ventana". Diseño §5.3.
+- **S10 — Cancelación y bloqueo duro.** "configurar si se puede cancelar el aviso/descanso; y junto con esto opcionalmente cuanta veces seguidas poder cancelarlo y si el usuario quiere seguir cancenlando el descanso desp de eso, pode configurar un bloqueo duro si o si, q hasta q no pase los minutos de descanso no libere.." Alcance: "que solo sea duro mientras esta en pantalla..." Diseño §5.4.
+- **S11 — Posponer.** "agregamos un boton de posponer n minutos (configurable) y hasta n veces (limitados de 0 a 3)." Diseño §5.4 (K por descanso; no suma al contador de cancelaciones; no disponible en el bloqueo duro).
+- **S12 — Inactividad.** "habilitar/deshabilitar configurar n minutos de inactividad para q deje de contar.... cuando esta habilitado y llega a los minutos configurado q deje de contar hasta q detecte actividad, cuando se detecta, que empice con el contador desde el inicio." Diseño §5.2.
+- **S13 — Tema.** "Agrega tb theme de la ventana: Claro / Osuro." Diseño §5.7.
+- **S14 — Idioma.** "La app debe estar toda la interface en español al igual que la documentacion." Diseño §3 (identificadores y comentarios en inglés).
+- **S15 — Ícono.** "agregue una carpeta @recursos/ con una foto png para usar de icono de la app" Y: "achica la imagen, no es necesario q sea tan grande apra usarla, solo deja kla orignal" Ya generados `recursos/rustpira.ico` y `recursos/rustpira-256.png`. Diseño §3, §5.1.
+- **S16 — Configuración y Acerca de.** "La opcion configuracion abrira una ventana para configurar todas las opciones de la app" Diseño §5.7, §5.8, §5.9 (persistencia en `%APPDATA%\rustpira\config.toml`), §5.10 (valores por defecto).
+
+## Tasks
+
+Pronóstico: alrededor de 3500 líneas escritas en total. Ruta: todas inline; no se dispara el Writer trigger porque no hay unidades paralelas independientes que justifiquen subagentes.
+
+| ID | Tarea | Specs | Ruta | Estado | Commit / evidencia |
+|---|---|---|---|---|---|
+| T0 | Base del repo: rama, `CLAUDE.md` (convenciones), `.gitignore`, `LICENSE` MIT, commit del diseño y los recursos | S14, S15 | inline | pendiente | — |
+| T1 | Prueba técnica de Slint (riesgos 1–4 de §8): overlay transparente y siempre encima en cada monitor, event loop sin ventanas junto a `tray-icon`, memoria liberada al cerrar ventanas, tema en tiempo de ejecución. Medición de RAM. El esqueleto que sirva queda como base | S1, S2, S9, S13 | inline | pendiente | — |
+| T2 | Dominio: modelo de configuración, valores por defecto, validación (franjas horarias) y persistencia TOML con `.bak` si el archivo es inválido | S5–S8, S10–S13, S16 | inline | pendiente | — |
+| T3 | Dominio: máquina de estados del temporizador (intervalo, horarios, inactividad, desactivar por lapso, suspensión y bloqueo de sesión, reloj inyectado) | S5, S7, S12, S3 | inline | pendiente | — |
+| T4 | Dominio: reglas del descanso (cancelar, límite, bloqueo duro, posponer K por descanso, contador persistido) y textos del tooltip | S4, S10, S11 | inline | pendiente | — |
+| T5 | Adaptadores Windows: bandeja, menú y tooltip, instancia única, inactividad, eventos de energía y sesión, loop de ticks | S2, S3, S4, S12 | inline | pendiente | — |
+| T6 | Overlay de descanso: ventanas por monitor, color o imagen con transparencia, ícono, título, mensaje, cuenta regresiva y botones; gancho de teclado; menú deshabilitado | S9, S10, S11, S3 | inline | pendiente | — |
+| T7 | Modo notificación y sonido (sonidos incluidos, `.wav` propio, volumen, Probar) | S5, S8 | inline | pendiente | — |
+| T8 | Ventana de configuración con pestañas, tema Claro/Oscuro, arranque con Windows, aplicar al guardar | S5–S8, S10–S13, S16 | inline | pendiente | — |
+| T9 | Acerca de, README en español (incluye las salidas aceptadas del bloqueo duro), build release y medición final de RAM | S1, S14, S16 | inline | pendiente | — |
+
+## Log
+
+- **L1 (2026-11-16) — Pedido original del usuario, textual:**
+  > Bueno aca va el detalle de la app:
+  >
+  > Vamos a hacer una app similar a BreakTimer que es una app para recordar hacer un corte cada nn minutos cuando trabajas en la compu.
+  > Requisitos:
+  > 1) Debe correr en windows 10/11 optmizando el uso de ram.
+  > 2) Duedar activa en la area de notificaciones como cualquier app residente.
+  > 3) Cuando avisa de tomarse un descanso, debe quedar sobreo todo lo q existe abierto, y bloquear todo acceso a cualquier cosa abierta y opcionalmente tendra un boton de cancelar descanso.
+  > Detalle de la configuracion y la app:
+  > Con boton derecho del mouse en el icono, apareceran las opciones: Configuracion, Desactivar recordatorios, Acerca de y Salir. En ela opcion Desactivar mostrara una lista de opciones  que seran lapsos de tiempos, 15m, 30m, 1h, 2h, 4h.
+  > La opcion configuracion abrira una ventana para configurar todas las opciones de la app:
+  > 1) Configurar cada cuantos minutos aparecera el aviso, tipo de aviso (bloqueo general o notificacion unicamente). Tambien configurar si se quiere que se cargue al iniciar windows.
+  > 2) configurar el titulo de la ventana y un mensaje de n lineas qua apareceran
+  > 3) Por cada dia de la semana se debe poder elegir n lapos de tiempo durante los cuales la app trabajara y avisará.... Seran los horarios de trabajo.
+  > 4) Tambien se debe poder configurar un sonido y el volumen del mismo, que aparecera cuando avise.
+  > 5) Cuando el bloqueo es pantalla completa, la idea es igual q breaktimer, que te permite elegir un color y te pinta toda la pantalla de ese color con un grado de transparencia configurable.
+  > 6) Otra opcion que no tiene breaktimer y que me gustaria es que se pueda configurar si se puede cancelar el aviso/descanso; y junto con esto opcionalmente cuanta veces seguidas poder cancelarlo y si el usuario quiere seguir cancenlando el descanso desp de eso, pode configurar un bloqueo duro si o si, q hasta q no pase los minutos de descanso no libere..
+  > 7) Agrega tb theme de la ventana: Claro / Osuro.
+  > Esas son las funcionalidades.
+  > La app debe estar toda la interface en español al igual que la documentacion.
+  > Tambien te doy libertad de hacerme sugerencias... y podes hacerme hasta 15 preguntas para cubrir cualquier duda.
+- **L2 (2026-11-16) — Aclaraciones del usuario, textuales:**
+  - "La app la voy a usar yo, pero la voy a subir a un repo publico y compartirla libremente."
+  - "Sobre el "Bloquear todo", si, breaktimer tiene la misma limitacion..." Se acepta que Ctrl+Alt+Supr no se puede bloquear.
+  - "Y el 2° podemos bloquear el desactivar del menu contextual durante cada bloqueo ya sea normal o duro."
+  - "Un agregado si se puede: Cuando el cursor este sobre el icono de la app que muetre un tooltip con un mensaje tipo "Siguiente descanso en hh:mm:ss""
+  - Inactividad, posponer, foto de fondo, ícono e ícono en la ventana: citados en S12, S11, S9 y S15.
+  - "que solo sea duro mientras esta en pantalla..."
+- **L3 (2026-11-16) — Decisiones:** se eligió Slint sin prueba previa. Diseño aprobado. Ícono: el original se conserva; `.ico` multitamaño (119 KB) y PNG de 256 px (105 KB) generados con System.Drawing. La revisión del diseño (builder check) planteó 4 preguntas: 3 se resolvieron como decisión del diseñador en §5.2, §5.3 y §8, y 1 la decidió el usuario (S10, alcance del bloqueo duro).
+- **Siguiente paso:** T0.

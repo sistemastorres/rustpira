@@ -1,0 +1,9 @@
+[package]
+name = "rustpira"
+version = "0.1.0"
+edition = "2024"
+description = "Recordatorio de descansos residente para Windows 10/11"
+license = "MIT"
+publish = false
+
+[dependencies]
