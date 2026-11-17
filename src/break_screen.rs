@@ -54,6 +54,10 @@ impl BreakScreen {
             window.on_cancel(move || cancel());
             let postpone = on_postpone.clone();
             window.on_postpone(move || postpone());
+            // Alt+F4 or any other close request must not end the break.
+            window
+                .window()
+                .on_close_requested(|| slint::CloseRequestResponse::KeepWindowShown);
 
             window
                 .window()
@@ -69,9 +73,15 @@ impl BreakScreen {
             windows.push(window);
         }
 
+        let keyboard = KeyboardBlock::install();
+        if keyboard.is_none() {
+            eprintln!(
+                "[rustpira] Windows rechazó el bloqueo de teclado; los atajos siguen activos"
+            );
+        }
         let screen = Self {
             windows,
-            _keyboard: KeyboardBlock::install(),
+            _keyboard: keyboard,
         };
         screen.update(view);
         Ok(screen)
