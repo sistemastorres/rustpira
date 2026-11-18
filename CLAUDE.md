@@ -17,7 +17,7 @@ Aplicación residente para Windows 10/11 que recuerda (y opcionalmente obliga) a
 
 ```
 src/
-  domain/      lógica pura: config, timer, reglas de descanso, tooltip
+  domain/      lógica pura: config, timer, reglas de descanso, tooltip, doble clic
   platform/    adaptadores de Windows: bandeja, inactividad, energía/sesión,
                registro, gancho de teclado, sonido, notificaciones
   storage/     archivos en %APPDATA%\rustpira\: config.toml (preferencias, con .bak)
