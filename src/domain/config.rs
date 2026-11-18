@@ -117,7 +117,8 @@ impl TimeSlot {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Weekday {
     Monday,
     Tuesday,
@@ -168,9 +169,35 @@ pub struct Schedule {
     pub friday: Vec<TimeSlot>,
     pub saturday: Vec<TimeSlot>,
     pub sunday: Vec<TimeSlot>,
+    /// Days switched off in "Horarios": they keep their slots but get no
+    /// reminders. Omitted from the file when empty, so older files load
+    /// with every day enabled.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub disabled: Vec<Weekday>,
 }
 
 impl Schedule {
+    pub fn is_enabled(&self, day: Weekday) -> bool {
+        !self.disabled.contains(&day)
+    }
+
+    pub fn set_enabled(&mut self, day: Weekday, enabled: bool) {
+        self.disabled.retain(|d| *d != day);
+        if !enabled {
+            self.disabled.push(day);
+            self.disabled.sort();
+        }
+    }
+
+    /// The slots that count today: none on a disabled day.
+    pub fn active(&self, day: Weekday) -> &[TimeSlot] {
+        if self.is_enabled(day) {
+            self.day(day)
+        } else {
+            &[]
+        }
+    }
+
     pub fn day(&self, day: Weekday) -> &[TimeSlot] {
         match day {
             Weekday::Monday => &self.monday,
@@ -661,6 +688,41 @@ mod tests {
         }
         assert_eq!(c.schedule.saturday, vec![slot((10, 0), (12, 0))]);
         assert!(c.schedule.sunday.is_empty());
+    }
+
+    #[test]
+    fn disabled_day_keeps_its_slots_but_has_no_active_hours() {
+        let mut c = Config::default();
+        let office = c.schedule.monday.clone();
+        assert!(c.schedule.is_enabled(Weekday::Monday));
+
+        c.schedule.set_enabled(Weekday::Monday, false);
+        assert!(!c.schedule.is_enabled(Weekday::Monday));
+        assert_eq!(c.schedule.day(Weekday::Monday), office.as_slice());
+        assert!(c.schedule.active(Weekday::Monday).is_empty());
+        assert_eq!(c.schedule.active(Weekday::Tuesday), office.as_slice());
+
+        c.schedule.set_enabled(Weekday::Monday, false);
+        assert_eq!(c.schedule.disabled, vec![Weekday::Monday]);
+        c.schedule.set_enabled(Weekday::Monday, true);
+        assert!(c.schedule.is_enabled(Weekday::Monday));
+        assert_eq!(c.schedule.active(Weekday::Monday), office.as_slice());
+    }
+
+    #[test]
+    fn disabled_days_round_trip_and_old_files_load_with_every_day_enabled() {
+        let mut c = Config::default();
+        c.schedule.set_enabled(Weekday::Sunday, false);
+        c.schedule.set_enabled(Weekday::Wednesday, false);
+        let text = c.to_toml();
+        assert!(text.contains("\"wednesday\""), "{text}");
+        assert_eq!(Config::from_toml(&text).unwrap(), c);
+
+        let old =
+            Config::from_toml("[schedule]\nmonday = [{ start = \"09:00\", end = \"12:00\" }]")
+                .unwrap();
+        assert!(Weekday::ALL.iter().all(|d| old.schedule.is_enabled(*d)));
+        assert!(!Config::default().to_toml().contains("disabled"));
     }
 
     #[test]

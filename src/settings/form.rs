@@ -38,6 +38,8 @@ pub struct Form {
     pub body: String,
     // Horarios, Monday to Sunday (`Weekday::ALL` order)
     pub days: [Vec<SlotText>; 7],
+    /// Per-day switch; a disabled day keeps its slots.
+    pub enabled: [bool; 7],
     // Descanso
     pub allow_cancel: bool,
     pub limit_cancels: bool,
@@ -88,6 +90,27 @@ fn parse_time(day: Weekday, text: &str) -> Result<TimeOfDay, String> {
     })
 }
 
+/// The arrows next to a time: moves to the next (or previous) quarter hour,
+/// within 00:00..23:59. Text that is not a time becomes 09:00.
+pub fn step_time(text: &str, up: bool) -> String {
+    const STEP: u16 = 15;
+    const LAST: u16 = 23 * 60 + 59;
+    let Some(time) = TimeOfDay::parse(text.trim()) else {
+        return "09:00".into();
+    };
+    let minutes = time.minutes();
+    let stepped = if up {
+        ((minutes / STEP + 1) * STEP).min(LAST)
+    } else if minutes % STEP == 0 {
+        minutes.saturating_sub(STEP)
+    } else {
+        minutes - minutes % STEP
+    };
+    TimeOfDay::new((stepped / 60) as u8, (stepped % 60) as u8)
+        .map(|t| t.to_string())
+        .unwrap_or_else(|| "09:00".into())
+}
+
 impl Form {
     pub fn from_config(config: &Config) -> Self {
         let sound = &config.sound;
@@ -100,6 +123,7 @@ impl Form {
             title: config.message.title.clone(),
             body: config.message.body.clone(),
             days: Weekday::ALL.map(|day| config.schedule.day(day).iter().map(slot_text).collect()),
+            enabled: Weekday::ALL.map(|day| config.schedule.is_enabled(day)),
             allow_cancel: config.breaks.allow_cancel,
             limit_cancels: config.breaks.limit_cancels,
             cancel_limit: config.breaks.cancel_limit.into(),
@@ -151,6 +175,9 @@ impl Form {
                 })
                 .collect::<Result<Vec<_>, String>>()?;
             *config.schedule.day_mut(day) = parsed;
+        }
+        for (day, enabled) in Weekday::ALL.into_iter().zip(self.enabled) {
+            config.schedule.set_enabled(day, enabled);
         }
 
         config.breaks.allow_cancel = self.allow_cancel;
@@ -240,6 +267,23 @@ impl Form {
         slots.push(slot);
     }
 
+    /// One arrow click on the start (or end) time of a slot.
+    pub fn step_slot(&mut self, day: usize, index: usize, start: bool, up: bool) {
+        let Some(slot) = self
+            .days
+            .get_mut(day)
+            .and_then(|slots| slots.get_mut(index))
+        else {
+            return;
+        };
+        let text = if start {
+            &mut slot.start
+        } else {
+            &mut slot.end
+        };
+        *text = step_time(text, up);
+    }
+
     pub fn remove_slot(&mut self, day: usize, index: usize) {
         if let Some(slots) = self.days.get_mut(day)
             && index < slots.len()
@@ -284,6 +328,7 @@ mod tests {
             TimeSlot::new(time(13, 30), time(17, 45)),
         ]);
         c.schedule.day_mut(Weekday::Sunday).clear();
+        c.schedule.set_enabled(Weekday::Tuesday, false);
         c.breaks.allow_cancel = false;
         c.breaks.limit_cancels = true;
         c.breaks.cancel_limit = 2;
@@ -453,6 +498,46 @@ mod tests {
             assert_eq!(slots, &vec![SlotText::new("10:00", "14:00")], "day {day}");
         }
         assert_eq!(form.days[6], vec![]);
+    }
+
+    #[test]
+    fn form_shows_which_days_are_enabled() {
+        let form = Form::from_config(&customized());
+        assert_eq!(form.enabled, [true, false, true, true, true, true, true]);
+        assert_eq!(form.days[1].len(), 1, "a disabled day keeps its slots");
+    }
+
+    #[test]
+    fn time_arrows_move_by_quarter_hours_and_stay_within_the_day() {
+        assert_eq!(step_time("09:00", true), "09:15");
+        assert_eq!(step_time("09:00", false), "08:45");
+        assert_eq!(step_time("09:07", true), "09:15");
+        assert_eq!(step_time("09:07", false), "09:00");
+        assert_eq!(step_time(" 12:30 ", true), "12:45");
+        assert_eq!(step_time("23:45", true), "23:59");
+        assert_eq!(step_time("23:59", true), "23:59");
+        assert_eq!(step_time("23:59", false), "23:45");
+        assert_eq!(step_time("00:00", false), "00:00");
+        assert_eq!(step_time("00:10", false), "00:00");
+    }
+
+    #[test]
+    fn time_arrows_turn_invalid_text_into_a_valid_time() {
+        assert_eq!(step_time("25:00", true), "09:00");
+        assert_eq!(step_time("", false), "09:00");
+    }
+
+    #[test]
+    fn step_slot_changes_only_the_chosen_time() {
+        let mut form = Form::from_config(&Config::default());
+        form.days[0] = vec![SlotText::new("09:00", "12:00")];
+        form.step_slot(0, 0, true, true);
+        assert_eq!(form.days[0][0], SlotText::new("09:15", "12:00"));
+        form.step_slot(0, 0, false, false);
+        assert_eq!(form.days[0][0], SlotText::new("09:15", "11:45"));
+        form.step_slot(0, 5, true, true);
+        form.step_slot(9, 0, true, true);
+        assert_eq!(form.days[0][0], SlotText::new("09:15", "11:45"));
     }
 
     #[test]

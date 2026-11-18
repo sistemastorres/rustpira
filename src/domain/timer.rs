@@ -88,7 +88,7 @@ impl WorkTimer {
 
         let in_hours = config
             .schedule
-            .day(now.weekday)
+            .active(now.weekday)
             .iter()
             .any(|slot| slot.start <= now.time && now.time < slot.end);
         if !in_hours {
@@ -259,6 +259,20 @@ mod tests {
             run(&mut t, &c, &mut saturday, 60, 0),
             TimerStatus::OutsideHours
         );
+    }
+
+    #[test]
+    fn disabled_day_counts_as_outside_work_hours() {
+        let mut c = Config::default();
+        c.schedule.set_enabled(Weekday::Monday, false);
+        let mut t = WorkTimer::new();
+        let mut monday = Clock::at(Weekday::Monday, 10, 0);
+        assert_eq!(
+            run(&mut t, &c, &mut monday, 60, 0),
+            TimerStatus::OutsideHours
+        );
+        let mut tuesday = Clock::at(Weekday::Tuesday, 10, 0);
+        assert_eq!(run(&mut t, &c, &mut tuesday, 0, 0), counting(50 * MIN));
     }
 
     #[test]

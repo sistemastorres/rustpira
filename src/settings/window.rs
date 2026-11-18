@@ -67,7 +67,8 @@ fn days_model(form: &Form) -> ModelRc<DayRow> {
     let rows: Vec<DayRow> = Weekday::ALL
         .iter()
         .zip(&form.days)
-        .map(|(day, slots)| {
+        .zip(form.enabled)
+        .map(|((day, slots), enabled)| {
             let slots: Vec<SlotRow> = slots
                 .iter()
                 .map(|slot| SlotRow {
@@ -77,6 +78,7 @@ fn days_model(form: &Form) -> ModelRc<DayRow> {
                 .collect();
             DayRow {
                 name: day.label().into(),
+                enabled,
                 slots: ModelRc::new(VecModel::from(slots)),
             }
         })
@@ -202,6 +204,26 @@ fn wire(window: &Settings, form: &Rc<RefCell<Form>>, hooks: Rc<Hooks>) {
     let copy = schedule_action(|form, day, _| form.copy_to_weekdays(day));
     window.on_copy_to_weekdays(move |day| copy(day, 0));
     window.on_remove_slot(schedule_action(Form::remove_slot));
+
+    let (form_ref, weak) = (form.clone(), window.as_weak());
+    window.on_step_time(move |day, index, start, up| {
+        let mut form = form_ref.borrow_mut();
+        form.step_slot(day as usize, index as usize, start, up);
+        if let Some(window) = weak.upgrade() {
+            window.set_days(days_model(&form));
+        }
+    });
+
+    let (form_ref, weak) = (form.clone(), window.as_weak());
+    window.on_day_toggled(move |day, enabled| {
+        let mut form = form_ref.borrow_mut();
+        if let Some(slot) = form.enabled.get_mut(day as usize) {
+            *slot = enabled;
+        }
+        if let Some(window) = weak.upgrade() {
+            window.set_days(days_model(&form));
+        }
+    });
 
     let weak = window.as_weak();
     window.on_color_edited(move |text| {
