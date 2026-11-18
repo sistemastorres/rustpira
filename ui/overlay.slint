@@ -12,6 +12,8 @@ export component BreakOverlay inherits Window {
     in property <string> heading;
     in property <string> message;
     in property <string> countdown: "05:00";
+    // Share of the break still ahead, 1.0 down to 0.0.
+    in property <float> progress: 1.0;
     in property <bool> hard: false;
     in property <bool> can-cancel: false;
     in property <bool> can-postpone: false;
@@ -39,55 +41,93 @@ export component BreakOverlay inherits Window {
 
     if root.primary: VerticalLayout {
         alignment: center;
-        spacing: 20px;
         padding: 40px;
 
         HorizontalLayout {
             alignment: center;
-            Image {
-                source: @image-url("../recursos/rustpira-256.png");
-                width: 128px;
-                height: 128px;
-            }
-        }
-        Text {
-            text: root.heading;
-            font-size: 44px;
-            font-weight: 700;
-            color: white;
-            horizontal-alignment: center;
-            wrap: word-wrap;
-        }
-        Text {
-            text: root.message;
-            font-size: 22px;
-            color: white;
-            horizontal-alignment: center;
-            wrap: word-wrap;
-        }
-        Text {
-            text: root.countdown;
-            font-size: 80px;
-            font-weight: 300;
-            color: white;
-            horizontal-alignment: center;
-        }
-        if root.hard: Text {
-            text: "Descanso obligatorio: no se puede cancelar ni posponer.";
-            font-size: 16px;
-            color: #ffffffcc;
-            horizontal-alignment: center;
-        }
-        HorizontalLayout {
-            alignment: center;
-            spacing: 16px;
-            if root.can-postpone: Button {
-                text: root.postpone-label;
-                clicked => { root.postpone(); }
-            }
-            if root.can-cancel: Button {
-                text: "Cancelar descanso";
-                clicked => { root.cancel(); }
+
+            // Rounded frame around the whole message (S23).
+            Rectangle {
+                width: min(760px, root.width - 80px);
+                border-radius: 24px;
+                background: #00000059;
+                border-width: 1px;
+                border-color: #ffffff40;
+
+                VerticalLayout {
+                    padding: 40px;
+                    spacing: 18px;
+
+                    HorizontalLayout {
+                        alignment: center;
+                        Image {
+                            source: @image-url("../recursos/rustpira-256.png");
+                            width: 128px;
+                            height: 128px;
+                        }
+                    }
+                    Text {
+                        text: root.heading;
+                        font-size: 44px;
+                        font-weight: 700;
+                        color: white;
+                        horizontal-alignment: center;
+                        wrap: word-wrap;
+                    }
+                    Text {
+                        text: root.message;
+                        font-size: 22px;
+                        color: white;
+                        horizontal-alignment: center;
+                        wrap: word-wrap;
+                    }
+                    Text {
+                        text: root.countdown;
+                        font-size: 80px;
+                        font-weight: 300;
+                        color: white;
+                        horizontal-alignment: center;
+                    }
+                    // Descending progress bar: full at the start, empty at the end.
+                    Rectangle {
+                        height: 10px;
+                        border-radius: 5px;
+                        background: #ffffff33;
+                        accessible-role: progress-indicator;
+                        accessible-value: Math.round(root.progress * 100) + " %";
+
+                        Rectangle {
+                            x: 0;
+                            y: 0;
+                            width: parent.width * max(0, min(1, root.progress));
+                            height: parent.height;
+                            border-radius: 5px;
+                            background: white;
+                            animate width {
+                                duration: 1s;
+                                easing: linear;
+                            }
+                        }
+                    }
+                    if root.hard: Text {
+                        text: "Descanso obligatorio: no se puede cancelar ni posponer.";
+                        font-size: 16px;
+                        color: #ffffffcc;
+                        horizontal-alignment: center;
+                    }
+                    HorizontalLayout {
+                        alignment: center;
+                        spacing: 16px;
+                        if root.can-postpone: Button {
+                            text: root.postpone-label;
+                            clicked => { root.postpone(); }
+                        }
+                        if root.can-cancel: Button {
+                            text: "Cancelar descanso";
+                            clicked => { root.cancel(); }
+                        }
+                    }
+                }
             }
         }
     }

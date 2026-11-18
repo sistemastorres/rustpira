@@ -98,8 +98,10 @@ impl BreakScreen {
             view.remaining_secs % 60
         );
         let refocus = !system::foreground_is_ours();
+        let progress = view.fraction_left();
         for window in &self.windows {
             window.set_countdown(countdown.clone().into());
+            window.set_progress(progress);
             window.set_hard(view.hard);
             window.set_can_cancel(view.can_cancel);
             window.set_can_postpone(view.can_postpone);

@@ -13,11 +13,24 @@ use crate::domain::timer::{Now, TimerStatus, WorkTimer};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BreakView {
     pub remaining_secs: u64,
+    /// Length of the whole break, for the progress bar.
+    pub total_secs: u64,
     /// Hard lock: no buttons at all until the countdown ends.
     pub hard: bool,
     pub can_cancel: bool,
     pub can_postpone: bool,
     pub postpone_minutes: u32,
+}
+
+impl BreakView {
+    /// Share of the break still ahead, from 1.0 (just started) to 0.0, for
+    /// the descending progress bar.
+    pub fn fraction_left(&self) -> f32 {
+        if self.total_secs == 0 {
+            return 0.0;
+        }
+        (self.remaining_secs.min(self.total_secs) as f32) / (self.total_secs as f32)
+    }
 }
 
 /// Enabled state of the tray menu items.
@@ -133,6 +146,7 @@ impl Engine {
                 postpones_used,
             } => Some(BreakView {
                 remaining_secs: ends_at.saturating_sub(now.mono_secs),
+                total_secs: u64::from(config.break_minutes) * 60,
                 hard,
                 can_cancel: rules.allow_cancel && !hard,
                 can_postpone: !hard && postpones_used < rules.max_postpones,
@@ -378,12 +392,43 @@ mod tests {
             view(&e, &c, &clock),
             Some(BreakView {
                 remaining_secs: 5 * MIN,
+                total_secs: 5 * MIN,
                 hard: false,
                 can_cancel: true,
                 can_postpone: true,
                 postpone_minutes: 5,
             })
         );
+    }
+
+    #[test]
+    fn progress_bar_goes_down_from_full_to_empty() {
+        let c = test_config(); // 5-minute break
+        let mut clock = Clock::new();
+        let mut e = Engine::new(0);
+        reach_break(&mut e, &c, &mut clock);
+        assert_eq!(view(&e, &c, &clock).unwrap().fraction_left(), 1.0);
+
+        run(&mut e, &c, &mut clock, 150);
+        assert_eq!(view(&e, &c, &clock).unwrap().fraction_left(), 0.5);
+
+        run(&mut e, &c, &mut clock, 149);
+        let last = view(&e, &c, &clock).unwrap();
+        assert_eq!(last.remaining_secs, 1);
+        assert!(last.fraction_left() > 0.0 && last.fraction_left() < 0.01);
+    }
+
+    #[test]
+    fn progress_of_an_empty_break_is_zero() {
+        let view = BreakView {
+            remaining_secs: 0,
+            total_secs: 0,
+            hard: false,
+            can_cancel: false,
+            can_postpone: false,
+            postpone_minutes: 5,
+        };
+        assert_eq!(view.fraction_left(), 0.0);
     }
 
     #[test]
