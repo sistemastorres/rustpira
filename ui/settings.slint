@@ -150,6 +150,11 @@ component Label inherits Text {
     min-width: 200px;
 }
 
+// Numeric field with a fixed, narrow width instead of filling the row.
+component NumberBox inherits SpinBox {
+    width: 120px;
+}
+
 component Hint inherits Text {
     font-size: 12px;
     color: Palette.foreground.with-alpha(0.65);
@@ -236,7 +241,7 @@ export component Settings inherits Window {
                     spacing: 12px;
                     HorizontalLayout {
                         Label { text: "Intervalo entre descansos (min)"; }
-                        SpinBox {
+                        NumberBox {
                             minimum: 1;
                             maximum: 240;
                             value <=> root.interval-minutes;
@@ -244,7 +249,7 @@ export component Settings inherits Window {
                     }
                     HorizontalLayout {
                         Label { text: "Duración del descanso (min)"; }
-                        SpinBox {
+                        NumberBox {
                             minimum: 1;
                             maximum: 60;
                             value <=> root.break-minutes;
@@ -379,7 +384,7 @@ export component Settings inherits Window {
                     }
                     HorizontalLayout {
                         Label { text: "Cancelaciones seguidas permitidas"; }
-                        SpinBox {
+                        NumberBox {
                             enabled: root.allow-cancel && root.limit-cancels;
                             minimum: 1;
                             maximum: 10;
@@ -391,7 +396,7 @@ export component Settings inherits Window {
                     }
                     HorizontalLayout {
                         Label { text: "Posponer (min)"; }
-                        SpinBox {
+                        NumberBox {
                             minimum: 1;
                             maximum: 30;
                             value <=> root.postpone-minutes;
@@ -399,7 +404,7 @@ export component Settings inherits Window {
                     }
                     HorizontalLayout {
                         Label { text: "Posponer hasta (veces por descanso)"; }
-                        SpinBox {
+                        NumberBox {
                             minimum: 0;
                             maximum: 3;
                             value <=> root.max-postpones;
@@ -411,7 +416,7 @@ export component Settings inherits Window {
                     }
                     HorizontalLayout {
                         Label { text: "Minutos sin actividad"; }
-                        SpinBox {
+                        NumberBox {
                             enabled: root.idle-enabled;
                             minimum: 1;
                             maximum: 120;
