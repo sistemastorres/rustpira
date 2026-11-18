@@ -116,22 +116,30 @@ pub fn foreground_is_ours() -> bool {
     process_id == unsafe { GetCurrentProcessId() }
 }
 
-/// An `https://` address with a host and no spaces: the only kind of link
-/// "Acerca de" opens, so the shell never runs a program or a local file.
-pub fn is_web_url(url: &str) -> bool {
-    url.strip_prefix("https://").is_some_and(|rest| {
-        let host = rest.split('/').next().unwrap_or_default();
-        !host.is_empty() && !url.chars().any(|c| c.is_whitespace() || c.is_control())
+/// An `https://` address with a host, or a `mailto:` with an address, and
+/// no spaces: the only links "Acerca de" opens, so the shell never runs a
+/// program or a local file.
+pub fn is_safe_link(url: &str) -> bool {
+    if url.chars().any(|c| c.is_whitespace() || c.is_control()) {
+        return false;
+    }
+    if let Some(rest) = url.strip_prefix("https://") {
+        return !rest.split('/').next().unwrap_or_default().is_empty();
+    }
+    url.strip_prefix("mailto:").is_some_and(|address| {
+        address
+            .split_once('@')
+            .is_some_and(|(user, domain)| !user.is_empty() && !domain.is_empty())
     })
 }
 
-/// Opens a web link in the default browser. Returns false if the text is
-/// not a web link or Windows could not open it.
-pub fn open_url(url: &str) -> bool {
+/// Opens a link with its default program (browser or mail). Returns false
+/// if the text is not a safe link or Windows could not open it.
+pub fn open_link(url: &str) -> bool {
     use windows_sys::Win32::UI::Shell::ShellExecuteW;
     use windows_sys::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
 
-    if !is_web_url(url) {
+    if !is_safe_link(url) {
         return false;
     }
     let wide = |text: &str| -> Vec<u16> { text.encode_utf16().chain([0]).collect() };
@@ -164,19 +172,23 @@ mod tests {
     }
 
     #[test]
-    fn only_https_addresses_count_as_web_links() {
-        assert!(is_web_url("https://github.com/usuario/rustpira"));
-        assert!(!is_web_url(""));
-        assert!(!is_web_url("http://example.com"));
-        assert!(!is_web_url("file:///C:/Windows/System32/cmd.exe"));
-        assert!(!is_web_url("C:\\Windows\\System32\\cmd.exe"));
-        assert!(!is_web_url("https://"));
-        assert!(!is_web_url("https://a b"));
+    fn only_https_and_mail_addresses_count_as_safe_links() {
+        assert!(is_safe_link("https://github.com/usuario/rustpira"));
+        assert!(is_safe_link("mailto:alguien@example.com"));
+        assert!(!is_safe_link(""));
+        assert!(!is_safe_link("http://example.com"));
+        assert!(!is_safe_link("file:///C:/Windows/System32/cmd.exe"));
+        assert!(!is_safe_link("C:\\Windows\\System32\\cmd.exe"));
+        assert!(!is_safe_link("https://"));
+        assert!(!is_safe_link("https://a b"));
+        assert!(!is_safe_link("mailto:"));
+        assert!(!is_safe_link("mailto:sin-arroba"));
+        assert!(!is_safe_link("mailto:a b@example.com"));
     }
 
     #[test]
-    fn open_url_refuses_anything_but_web_links() {
-        assert!(!open_url("calc.exe"));
+    fn open_link_refuses_anything_but_safe_links() {
+        assert!(!open_link("calc.exe"));
     }
 
     #[test]

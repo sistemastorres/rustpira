@@ -4,6 +4,9 @@ version = "0.1.0"
 edition = "2024"
 description = "Recordatorio de descansos residente para Windows 10/11"
 license = "MIT"
+authors = ["Sistemas Torres <sistemastorres.info@gmail.com>"]
+repository = "https://github.com/sistemastorres/rustpira"
+homepage = "https://www.sistemastorres.com/"
 publish = false
 
 [dependencies]

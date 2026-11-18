@@ -1,40 +1,62 @@
-// "Acerca de" (design §5.8). Created when opened, destroyed when closed.
+// "Acerca de" (design §5.8, S21). Created when opened, destroyed when closed.
 
-import { AboutSlint, Button, Palette } from "std-widgets.slint";
+import { Button, Palette } from "std-widgets.slint";
+
+// Clickable text that opens a link.
+component Link inherits Text {
+    in property <string> description;
+    callback activated();
+
+    color: Palette.accent-background;
+    horizontal-alignment: center;
+    accessible-role: button;
+    accessible-label: root.description;
+    TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.activated(); }
+    }
+}
 
 export component About inherits Window {
     in property <string> version;
+    in property <string> developer;
+    in property <string> site;
+    in property <string> mail;
     // Empty when the package has no repository URL: the link is hidden.
     in property <string> repository;
     in property <int> theme-index; // 0 = claro, 1 = oscuro
 
+    callback open-site();
+    callback open-mail();
     callback open-repository();
     callback close-clicked();
 
     title: "Rustpira - Acerca de";
     icon: @image-url("../recursos/rustpira-256.png");
-    width: 380px;
+    width: 460px;
 
     init => {
         Palette.color-scheme = root.theme-index == 1 ? ColorScheme.dark : ColorScheme.light;
     }
 
     VerticalLayout {
-        padding: 20px;
+        padding: 28px;
         spacing: 10px;
         alignment: start;
 
         HorizontalLayout {
             alignment: center;
+            // Half the size of the 256 px source, so it is downscaled
+            // by an exact factor and stays sharp.
             Image {
                 source: @image-url("../recursos/rustpira-256.png");
-                width: 96px;
-                height: 96px;
+                width: 128px;
+                height: 128px;
             }
         }
         Text {
             text: "Rustpira";
-            font-size: 22px;
+            font-size: 26px;
             font-weight: 700;
             horizontal-alignment: center;
         }
@@ -47,27 +69,34 @@ export component About inherits Window {
             horizontal-alignment: center;
             wrap: word-wrap;
         }
+        Rectangle { height: 6px; }
+        Text {
+            text: "Desarrollado por " + root.developer;
+            font-weight: 600;
+            horizontal-alignment: center;
+        }
+        Link {
+            text: root.site;
+            description: "Abrir el sitio web de " + root.developer;
+            activated => { root.open-site(); }
+        }
+        Link {
+            text: root.mail;
+            description: "Escribir un correo a " + root.developer;
+            activated => { root.open-mail(); }
+        }
+        Rectangle { height: 6px; }
         Text {
             text: "Software libre bajo la licencia MIT.";
             horizontal-alignment: center;
             color: Palette.foreground.with-alpha(0.7);
         }
-        if root.repository != "": HorizontalLayout {
-            alignment: center;
-            Text {
-                text: root.repository;
-                color: Palette.accent-background;
-                accessible-role: button;
-                accessible-label: "Abrir el repositorio en el navegador";
-                TouchArea {
-                    mouse-cursor: pointer;
-                    clicked => { root.open-repository(); }
-                }
-            }
+        if root.repository != "": Link {
+            text: root.repository;
+            description: "Abrir el repositorio en el navegador";
+            activated => { root.open-repository(); }
         }
-        AboutSlint {
-            preferred-height: 120px;
-        }
+        Rectangle { height: 8px; }
         HorizontalLayout {
             alignment: end;
             Button {

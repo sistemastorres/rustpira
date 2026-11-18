@@ -30,7 +30,7 @@ Para que arranque con Windows, active **Iniciar con Windows** en la pestaña Gen
 | Configuración | Abre la ventana de configuración. Los cambios se aplican al guardar y el contador vuelve a empezar. |
 | Desactivar recordatorios | Pausa los avisos durante 15 minutos, 30 minutos, 1, 2 o 4 horas. |
 | Reactivar ahora | Aparece mientras los avisos están desactivados y los vuelve a activar. |
-| Acerca de | Versión, licencia y enlace al repositorio. |
+| Acerca de | Versión, licencia, datos del desarrollador y enlace al repositorio. |
 | Salir | Cierra Rustpira. |
 
 Mientras hay un descanso en pantalla, **Configuración**, **Desactivar recordatorios** y **Salir** quedan deshabilitados.
@@ -80,6 +80,8 @@ La guía para contribuir (arquitectura y reglas del proyecto) está en [`CLAUDE.
 
 ## Licencia
 
-Rustpira es software libre bajo la [licencia MIT](LICENSE).
+Rustpira es software libre bajo la [licencia MIT](LICENSE). Desarrollado por [Sistemas Torres](https://www.sistemastorres.com/).
 
-La interfaz está hecha con [Slint](https://slint.dev/), que se usa bajo su licencia gratuita (Royalty-free License). Como pide esa licencia, la ventana **Acerca de** muestra la mención oficial de Slint ("Made with Slint").
+La interfaz está hecha con [Slint](https://slint.dev/), que se usa bajo su licencia gratuita (Royalty-free License 2.0). Esa licencia pide mostrar esta insignia en la página donde se descarga la aplicación:
+
+[![Made with Slint](https://raw.githubusercontent.com/slint-ui/slint/master/logo/MadeWithSlint-logo-whitebg.png)](https://slint.dev/)
