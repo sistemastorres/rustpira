@@ -3,9 +3,16 @@
 //! Pure: no Slint, no Windows, so every rule is unit tested.
 
 use crate::domain::config::{
-    BUILTIN_SOUNDS, Background, Config, NoticeKind, Rgb, SoundConfig, SoundSource, Theme,
-    TimeOfDay, TimeSlot, Weekday,
+    BUILTIN_SOUNDS, Background, Config, DoubleClickAction, NoticeKind, Rgb, SoundConfig,
+    SoundSource, Theme, TimeOfDay, TimeSlot, Weekday,
 };
+
+/// "Doble clic en el ícono" list, in display order.
+pub const DOUBLE_CLICK_ACTIONS: [DoubleClickAction; 3] = [
+    DoubleClickAction::OpenSettings,
+    DoubleClickAction::StartBreak,
+    DoubleClickAction::Pause30,
+];
 
 /// Index of "Archivo propio (.wav)" in the sound list; 0..BUILTIN_SOUNDS
 /// are the built-in sounds.
@@ -33,6 +40,8 @@ pub struct Form {
     pub break_minutes: i32,
     pub notification_only: bool,
     pub start_with_windows: bool,
+    /// Index in `DOUBLE_CLICK_ACTIONS`.
+    pub double_click: i32,
     // Mensaje
     pub title: String,
     pub body: String,
@@ -120,6 +129,10 @@ impl Form {
             break_minutes: config.break_minutes as i32,
             notification_only: config.notice == NoticeKind::Notification,
             start_with_windows: config.start_with_windows,
+            double_click: DOUBLE_CLICK_ACTIONS
+                .iter()
+                .position(|action| *action == config.double_click)
+                .unwrap_or(0) as i32,
             title: config.message.title.clone(),
             body: config.message.body.clone(),
             days: Weekday::ALL.map(|day| config.schedule.day(day).iter().map(slot_text).collect()),
@@ -161,6 +174,10 @@ impl Form {
             NoticeKind::Lock
         };
         config.start_with_windows = self.start_with_windows;
+        config.double_click = usize::try_from(self.double_click)
+            .ok()
+            .and_then(|index| DOUBLE_CLICK_ACTIONS.get(index).copied())
+            .unwrap_or_default();
         config.message.title = self.title.clone();
         config.message.body = self.body.clone();
 
@@ -328,6 +345,7 @@ mod tests {
         c.break_minutes = 3;
         c.notice = NoticeKind::Notification;
         c.start_with_windows = true;
+        c.double_click = DoubleClickAction::Pause30;
         c.message.title = "Pausa".into();
         c.message.body = "Línea 1\nLínea 2".into();
         c.schedule.day_mut(Weekday::Monday).clear();

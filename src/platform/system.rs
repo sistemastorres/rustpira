@@ -116,6 +116,20 @@ pub fn foreground_is_ours() -> bool {
     process_id == unsafe { GetCurrentProcessId() }
 }
 
+/// Milliseconds since Windows started (monotonic), for the double-click
+/// detector.
+pub fn tick_ms() -> u64 {
+    // SAFETY: no preconditions.
+    unsafe { GetTickCount64() }
+}
+
+/// The user's double-click time, in milliseconds.
+pub fn double_click_ms() -> u64 {
+    use windows_sys::Win32::UI::Input::KeyboardAndMouse::GetDoubleClickTime;
+    // SAFETY: no preconditions.
+    u64::from(unsafe { GetDoubleClickTime() })
+}
+
 /// An `https://` address with a host, or a `mailto:` with an address, and
 /// no spaces: the only links "Acerca de" opens, so the shell never runs a
 /// program or a local file.
@@ -184,6 +198,15 @@ mod tests {
         assert!(!is_safe_link("mailto:"));
         assert!(!is_safe_link("mailto:sin-arroba"));
         assert!(!is_safe_link("mailto:a b@example.com"));
+    }
+
+    #[test]
+    fn double_click_time_and_clock_are_sane() {
+        // Windows allows 200..=5000 ms; the default is 500.
+        let window = double_click_ms();
+        assert!((1..=5_000).contains(&window), "{window}");
+        let first = tick_ms();
+        assert!(tick_ms() >= first);
     }
 
     #[test]

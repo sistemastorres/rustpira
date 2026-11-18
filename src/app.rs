@@ -10,7 +10,8 @@ use std::time::Duration;
 
 use crate::about::AboutWindow;
 use crate::break_screen::BreakScreen;
-use crate::domain::config::{Config, Theme};
+use crate::domain::config::{Config, DoubleClickAction, Theme};
+use crate::domain::double_click::DoubleClick;
 use crate::domain::engine::{BreakView, Effect, Engine};
 use crate::platform::autostart;
 use crate::platform::notify;
@@ -31,6 +32,7 @@ struct App {
     break_screen: RefCell<Option<BreakScreen>>,
     settings: RefCell<Option<SettingsWindow>>,
     about: RefCell<Option<AboutWindow>>,
+    double_click: RefCell<DoubleClick>,
     config_path: PathBuf,
     player: Player,
     this: Weak<App>,
@@ -71,6 +73,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         break_screen: RefCell::new(None),
         settings: RefCell::new(None),
         about: RefCell::new(None),
+        double_click: RefCell::new(DoubleClick::new()),
         config_path,
         player: Player::new(),
         this: this.clone(),
@@ -124,6 +127,19 @@ fn wire_tray(app: &Rc<App>) {
     app.tray.on_open_settings(move || {
         if let Some(app) = weak.upgrade() {
             app.open_settings();
+        }
+    });
+
+    let weak = Rc::downgrade(app);
+    app.tray.on_icon_clicked(move || {
+        if let Some(app) = weak.upgrade() {
+            let double = app
+                .double_click
+                .borrow_mut()
+                .click(system::tick_ms(), system::double_click_ms());
+            if double {
+                app.double_clicked();
+            }
         }
     });
 
@@ -321,6 +337,29 @@ impl App {
         match opened {
             Ok(window) => *self.settings.borrow_mut() = Some(window),
             Err(e) => eprintln!("[rustpira] no se pudo abrir la configuración: {e}"),
+        }
+    }
+
+    /// Runs the action chosen for a double click on the tray icon (S24).
+    fn double_clicked(&self) {
+        let action = self.config.borrow().double_click;
+        match action {
+            DoubleClickAction::OpenSettings => self.open_settings(),
+            DoubleClickAction::StartBreak => {
+                let effects = {
+                    let config = self.config.borrow();
+                    self.engine
+                        .borrow_mut()
+                        .start_break_now(&config, system::now())
+                };
+                self.apply(&effects);
+                self.refresh();
+            }
+            DoubleClickAction::Pause30 => {
+                self.engine.borrow_mut().toggle_pause(system::now(), 30);
+                // Tick so the tooltip and the menu show the new state now.
+                self.tick();
+            }
         }
     }
 

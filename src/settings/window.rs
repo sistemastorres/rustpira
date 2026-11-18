@@ -92,6 +92,7 @@ fn load(window: &Settings, form: &Form) {
     window.set_break_minutes(form.break_minutes);
     window.set_notice_index(i32::from(form.notification_only));
     window.set_start_with_windows(form.start_with_windows);
+    window.set_double_click_index(form.double_click);
     window.set_heading(form.title.as_str().into());
     window.set_message(form.body.as_str().into());
     window.set_days(days_model(form));
@@ -127,6 +128,7 @@ fn read(window: &Settings, form: &mut Form) {
     form.break_minutes = window.get_break_minutes();
     form.notification_only = window.get_notice_index() == 1;
     form.start_with_windows = window.get_start_with_windows();
+    form.double_click = window.get_double_click_index();
     form.title = window.get_heading().into();
     form.body = window.get_message().into();
     form.allow_cancel = window.get_allow_cancel();

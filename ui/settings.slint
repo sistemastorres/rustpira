@@ -166,6 +166,7 @@ export component Settings inherits Window {
     in-out property <int> interval-minutes;
     in-out property <int> break-minutes;
     in-out property <int> notice-index; // 0 = bloqueo, 1 = notificación
+    in-out property <int> double-click-index; // see form::DOUBLE_CLICK_ACTIONS
     in-out property <bool> start-with-windows;
     // Mensaje
     in-out property <string> heading;
@@ -261,6 +262,17 @@ export component Settings inherits Window {
                             model: ["Pantalla completa (bloquea todo)", "Solo notificación"];
                             current-index <=> root.notice-index;
                         }
+                    }
+                    HorizontalLayout {
+                        Label { text: "Doble clic en el ícono"; }
+                        ComboBox {
+                            // Same order as `form::DOUBLE_CLICK_ACTIONS`.
+                            model: ["Abrir la configuración", "Empezar un descanso", "Pausar 30 minutos"];
+                            current-index <=> root.double-click-index;
+                        }
+                    }
+                    if root.double-click-index == 2: Hint {
+                        text: "Otro doble clic vuelve a activar los recordatorios.";
                     }
                     CheckBox {
                         text: "Iniciar con Windows";

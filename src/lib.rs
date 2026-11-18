@@ -6,6 +6,7 @@
 
 pub mod domain {
     pub mod config;
+    pub mod double_click;
     pub mod engine;
     pub mod timer;
 }

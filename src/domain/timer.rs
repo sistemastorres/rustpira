@@ -139,6 +139,12 @@ impl WorkTimer {
         });
     }
 
+    /// Whether a "Desactivar recordatorios" period is still running.
+    pub fn is_disabled(&self, now: Now) -> bool {
+        self.disabled
+            .is_some_and(|disabled| now.mono_secs < disabled.mono_secs)
+    }
+
     /// "Reactivar ahora": end a disable period and count from zero.
     pub fn reactivate(&mut self) {
         self.disabled = None;

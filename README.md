@@ -35,6 +35,8 @@ Para que arranque con Windows, active **Iniciar con Windows** en la pestaña Gen
 
 Mientras hay un descanso en pantalla, **Configuración**, **Desactivar recordatorios** y **Salir** quedan deshabilitados.
 
+El **doble clic** en el ícono hace lo que elija en la pestaña General: abrir la configuración (opción por defecto), empezar un descanso en ese momento, o pausar los recordatorios 30 minutos. Con esta última opción, otro doble clic los vuelve a activar.
+
 ## Límites del descanso obligatorio
 
 Durante un descanso, la pantalla cubre todos los monitores y se bloquean los atajos para salir de ella (Alt+Tab, Alt+F4, Esc). El descanso obligatorio además oculta los botones. No es un bloqueo de seguridad: estas salidas siguen disponibles a propósito o porque Windows no permite bloquearlas:

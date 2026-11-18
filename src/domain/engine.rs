@@ -240,6 +240,28 @@ impl Engine {
         self.timer.reactivate();
     }
 
+    /// Double click set to "Empezar un descanso": shows the break screen
+    /// now, whatever the notice mode. Ignored while a break is on screen.
+    pub fn start_break_now(&mut self, config: &Config, now: Now) -> Vec<Effect> {
+        match self.phase {
+            Phase::OnBreak { .. } => Vec::new(),
+            Phase::Postponed { postpones_used, .. } => {
+                self.start_break(config, now, postpones_used)
+            }
+            Phase::Working => self.start_break(config, now, 0),
+        }
+    }
+
+    /// Double click set to "Pausar 30 minutos": pauses the reminders, or
+    /// reactivates them if they are paused.
+    pub fn toggle_pause(&mut self, now: Now, minutes: u32) {
+        if self.timer.is_disabled(now) {
+            self.reactivate();
+        } else {
+            self.disable_for(now, minutes);
+        }
+    }
+
     /// The configuration was saved: restart the interval.
     pub fn config_changed(&mut self) {
         self.timer.restart();
@@ -607,6 +629,71 @@ mod tests {
 
         reach_break(&mut e, &c, &mut clock);
         assert!(view(&e, &c, &clock).unwrap().can_postpone);
+    }
+
+    #[test]
+    fn a_break_can_be_started_at_once_and_runs_like_any_other() {
+        let c = test_config();
+        let mut clock = Clock::new();
+        let mut e = Engine::new(0);
+        run(&mut e, &c, &mut clock, 10);
+
+        assert_eq!(
+            e.start_break_now(&c, clock.now()),
+            vec![Effect::BreakStarted]
+        );
+        let view = view(&e, &c, &clock).unwrap();
+        assert_eq!(view.remaining_secs, 5 * MIN);
+        assert!(view.can_cancel);
+        // Already on screen: a second request changes nothing.
+        assert_eq!(e.start_break_now(&c, clock.now()), vec![]);
+    }
+
+    #[test]
+    fn a_break_started_at_once_shows_the_screen_even_in_notification_mode() {
+        let mut c = test_config();
+        c.notice = NoticeKind::Notification;
+        let mut clock = Clock::new();
+        let mut e = Engine::new(0);
+        run(&mut e, &c, &mut clock, 1);
+        assert_eq!(
+            e.start_break_now(&c, clock.now()),
+            vec![Effect::BreakStarted]
+        );
+        assert!(view(&e, &c, &clock).is_some());
+    }
+
+    #[test]
+    fn toggle_pause_pauses_and_a_second_toggle_reactivates() {
+        let c = test_config();
+        let mut clock = Clock::new();
+        let mut e = Engine::new(0);
+        run(&mut e, &c, &mut clock, 1);
+
+        e.toggle_pause(clock.now(), 30);
+        run(&mut e, &c, &mut clock, 1);
+        assert_eq!(
+            tooltip(&e, &c, &clock),
+            "Recordatorios desactivados hasta las 10:30"
+        );
+
+        e.toggle_pause(clock.now(), 30);
+        run(&mut e, &c, &mut clock, 0);
+        assert_eq!(tooltip(&e, &c, &clock), "Siguiente descanso en 00:50:00");
+    }
+
+    #[test]
+    fn toggle_pause_pauses_again_once_the_pause_is_over() {
+        let c = test_config();
+        let mut clock = Clock::new();
+        let mut e = Engine::new(0);
+        e.toggle_pause(clock.now(), 1);
+        run(&mut e, &c, &mut clock, MIN);
+        assert!(tooltip(&e, &c, &clock).starts_with("Siguiente descanso"));
+
+        e.toggle_pause(clock.now(), 1);
+        run(&mut e, &c, &mut clock, 1);
+        assert!(tooltip(&e, &c, &clock).starts_with("Recordatorios desactivados"));
     }
 
     #[test]

@@ -241,6 +241,21 @@ pub enum NoticeKind {
     Notification,
 }
 
+/// What a double click on the tray icon does (S24).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DoubleClickAction {
+    /// Opens the settings window.
+    #[default]
+    OpenSettings,
+    /// Shows a break right away.
+    StartBreak,
+    /// Pauses the reminders for 30 minutes; another double click
+    /// reactivates them.
+    #[serde(rename = "pause_30")]
+    Pause30,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct MessageConfig {
@@ -388,6 +403,7 @@ pub struct Config {
     pub break_minutes: u32,
     pub notice: NoticeKind,
     pub start_with_windows: bool,
+    pub double_click: DoubleClickAction,
     pub message: MessageConfig,
     pub schedule: Schedule,
     pub breaks: BreakRules,
@@ -411,6 +427,7 @@ impl Default for Config {
             break_minutes: 5,
             notice: NoticeKind::Lock,
             start_with_windows: false,
+            double_click: DoubleClickAction::OpenSettings,
             message: MessageConfig::default(),
             schedule,
             breaks: BreakRules::default(),
@@ -738,6 +755,24 @@ mod tests {
                 .unwrap();
         assert!(Weekday::ALL.iter().all(|d| old.schedule.is_enabled(*d)));
         assert!(!Config::default().to_toml().contains("disabled"));
+    }
+
+    #[test]
+    fn double_click_opens_settings_by_default_and_is_stored_by_name() {
+        assert_eq!(
+            Config::default().double_click,
+            DoubleClickAction::OpenSettings
+        );
+        for (name, action) in [
+            ("open_settings", DoubleClickAction::OpenSettings),
+            ("start_break", DoubleClickAction::StartBreak),
+            ("pause_30", DoubleClickAction::Pause30),
+        ] {
+            let c = Config::from_toml(&format!("double_click = \"{name}\"")).unwrap();
+            assert_eq!(c.double_click, action, "{name}");
+            assert!(c.to_toml().contains(&format!("double_click = \"{name}\"")));
+        }
+        assert!(Config::from_toml("double_click = \"triple\"").is_err());
     }
 
     #[test]

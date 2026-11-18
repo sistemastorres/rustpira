@@ -13,9 +13,12 @@ export component Tray inherits SystemTrayIcon {
     callback reactivate();
     callback about();
     callback quit();
+    // Left click on the icon; Rust tells double clicks apart.
+    callback icon-clicked();
 
     icon: @image-url("../recursos/rustpira-256.png");
     tooltip: root.tip;
+    clicked => { root.icon-clicked(); }
 
     Menu {
         MenuItem {
