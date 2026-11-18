@@ -292,6 +292,24 @@ mod tests {
     use super::*;
     use crate::domain::config::{TimeOfDay, Weekday};
 
+    /// The configuration these tests were written against, independent of
+    /// the product defaults: 50-minute interval, 5-minute break, 9:00-18:00
+    /// on weekdays, idle pause after 5 minutes, cancel allowed with no limit.
+    fn test_config() -> Config {
+        let mut c = Config::default();
+        c.interval_minutes = 50;
+        c.break_minutes = 5;
+        c.notice = crate::domain::config::NoticeKind::Lock;
+        c.breaks.allow_cancel = true;
+        c.breaks.limit_cancels = false;
+        c.breaks.cancel_limit = 3;
+        c.breaks.postpone_minutes = 5;
+        c.breaks.max_postpones = 1;
+        c.idle.enabled = true;
+        c.idle.minutes = 5;
+        c
+    }
+
     const MIN: u64 = 60;
 
     struct Clock {
@@ -349,7 +367,7 @@ mod tests {
 
     #[test]
     fn lock_mode_shows_the_break_when_the_interval_elapses() {
-        let c = Config::default();
+        let c = test_config();
         let mut clock = Clock::new();
         let mut e = Engine::new(0);
 
@@ -370,7 +388,7 @@ mod tests {
 
     #[test]
     fn the_break_ends_by_itself_and_the_next_interval_starts() {
-        let c = Config::default();
+        let c = test_config();
         let mut clock = Clock::new();
         let mut e = Engine::new(0);
         reach_break(&mut e, &c, &mut clock);
@@ -384,7 +402,7 @@ mod tests {
 
     #[test]
     fn the_countdown_follows_real_time_across_sleep() {
-        let c = Config::default();
+        let c = test_config();
         let mut clock = Clock::new();
         let mut e = Engine::new(0);
         reach_break(&mut e, &c, &mut clock);
@@ -402,7 +420,7 @@ mod tests {
 
     #[test]
     fn cancel_counts_hides_the_break_and_restarts_the_interval() {
-        let c = Config::default();
+        let c = test_config();
         let mut clock = Clock::new();
         let mut e = Engine::new(0);
         reach_break(&mut e, &c, &mut clock);
@@ -424,7 +442,7 @@ mod tests {
 
     #[test]
     fn cancel_is_not_offered_nor_accepted_when_disallowed() {
-        let mut c = Config::default();
+        let mut c = test_config();
         c.breaks.allow_cancel = false;
         let mut clock = Clock::new();
         let mut e = Engine::new(0);
@@ -438,7 +456,7 @@ mod tests {
 
     #[test]
     fn reaching_the_cancel_limit_makes_the_next_break_hard() {
-        let mut c = Config::default();
+        let mut c = test_config();
         c.breaks.limit_cancels = true;
         c.breaks.cancel_limit = 2;
         let mut clock = Clock::new();
@@ -473,7 +491,7 @@ mod tests {
 
     #[test]
     fn without_a_limit_cancelling_never_hard_locks() {
-        let c = Config::default(); // limit_cancels = false
+        let c = test_config(); // limit_cancels = false
         let mut clock = Clock::new();
         let mut e = Engine::new(0);
         for _ in 0..6 {
@@ -485,7 +503,7 @@ mod tests {
 
     #[test]
     fn a_persisted_counter_at_the_limit_hard_locks_the_first_break() {
-        let mut c = Config::default();
+        let mut c = test_config();
         c.breaks.limit_cancels = true;
         c.breaks.cancel_limit = 3;
         let mut clock = Clock::new();
@@ -496,7 +514,7 @@ mod tests {
 
     #[test]
     fn postpone_brings_the_break_back_after_m_minutes_up_to_k_times() {
-        let mut c = Config::default();
+        let mut c = test_config();
         c.breaks.postpone_minutes = 5;
         c.breaks.max_postpones = 2;
         let mut clock = Clock::new();
@@ -523,7 +541,7 @@ mod tests {
 
     #[test]
     fn zero_postpones_hides_the_button() {
-        let mut c = Config::default();
+        let mut c = test_config();
         c.breaks.max_postpones = 0;
         let mut clock = Clock::new();
         let mut e = Engine::new(0);
@@ -533,7 +551,7 @@ mod tests {
 
     #[test]
     fn the_postpone_allowance_is_per_break() {
-        let c = Config::default(); // max_postpones = 1
+        let c = test_config(); // max_postpones = 1
         let mut clock = Clock::new();
         let mut e = Engine::new(0);
         reach_break(&mut e, &c, &mut clock);
@@ -548,7 +566,7 @@ mod tests {
 
     #[test]
     fn notification_mode_notifies_without_a_break_screen_and_restarts() {
-        let mut c = Config::default();
+        let mut c = test_config();
         c.notice = NoticeKind::Notification;
         let mut clock = Clock::new();
         let mut e = Engine::new(0);
@@ -562,7 +580,7 @@ mod tests {
 
     #[test]
     fn activity_after_an_idle_pause_is_announced_once() {
-        let c = Config::default(); // idle pause after 5 min
+        let c = test_config(); // idle pause after 5 min
         let mut clock = Clock::new();
         let mut e = Engine::new(0);
         run(&mut e, &c, &mut clock, 60);
@@ -581,7 +599,7 @@ mod tests {
 
     #[test]
     fn plain_counting_never_announces_idle_end() {
-        let c = Config::default();
+        let c = test_config();
         let mut clock = Clock::new();
         let mut e = Engine::new(0);
         let effects = run(&mut e, &c, &mut clock, 10 * MIN);
@@ -590,7 +608,7 @@ mod tests {
 
     #[test]
     fn menu_items_are_disabled_while_the_break_is_on_screen() {
-        let c = Config::default();
+        let c = test_config();
         let mut clock = Clock::new();
         let mut e = Engine::new(0);
         run(&mut e, &c, &mut clock, 1);
@@ -606,7 +624,7 @@ mod tests {
 
     #[test]
     fn disable_is_ignored_while_the_break_is_on_screen() {
-        let c = Config::default();
+        let c = test_config();
         let mut clock = Clock::new();
         let mut e = Engine::new(0);
         reach_break(&mut e, &c, &mut clock);
@@ -617,7 +635,7 @@ mod tests {
 
     #[test]
     fn tooltip_and_reactivate_reflect_each_state() {
-        let c = Config::default();
+        let c = test_config();
         let mut clock = Clock::new();
         let mut e = Engine::new(0);
 
@@ -653,7 +671,7 @@ mod tests {
 
     #[test]
     fn tooltip_during_and_after_postponing() {
-        let c = Config::default();
+        let c = test_config();
         let mut clock = Clock::new();
         let mut e = Engine::new(0);
         reach_break(&mut e, &c, &mut clock);

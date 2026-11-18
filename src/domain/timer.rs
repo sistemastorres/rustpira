@@ -161,9 +161,28 @@ impl WorkTimer {
 }
 
 #[cfg(test)]
+#[allow(clippy::field_reassign_with_default)] // tests tweak fields of the defaults
 mod tests {
     use super::*;
     use crate::domain::config::TimeSlot;
+
+    /// The configuration these tests were written against, independent of
+    /// the product defaults: 50-minute interval, 5-minute break, 9:00-18:00
+    /// on weekdays, idle pause after 5 minutes, cancel allowed with no limit.
+    fn test_config() -> Config {
+        let mut c = Config::default();
+        c.interval_minutes = 50;
+        c.break_minutes = 5;
+        c.notice = crate::domain::config::NoticeKind::Lock;
+        c.breaks.allow_cancel = true;
+        c.breaks.limit_cancels = false;
+        c.breaks.cancel_limit = 3;
+        c.breaks.postpone_minutes = 5;
+        c.breaks.max_postpones = 1;
+        c.idle.enabled = true;
+        c.idle.minutes = 5;
+        c
+    }
 
     const MIN: u64 = 60;
 
@@ -224,7 +243,7 @@ mod tests {
 
     #[test]
     fn counts_down_during_work_hours() {
-        let c = Config::default();
+        let c = test_config();
         let mut clock = Clock::at(Weekday::Monday, 10, 0);
         let mut t = WorkTimer::new();
         assert_eq!(run(&mut t, &c, &mut clock, 10 * MIN, 0), counting(40 * MIN));
@@ -232,7 +251,7 @@ mod tests {
 
     #[test]
     fn break_is_due_after_the_interval_and_holds_until_restart() {
-        let c = Config::default();
+        let c = test_config();
         let mut clock = Clock::at(Weekday::Monday, 10, 0);
         let mut t = WorkTimer::new();
         assert_eq!(
@@ -247,7 +266,7 @@ mod tests {
 
     #[test]
     fn does_not_count_outside_work_hours() {
-        let c = Config::default();
+        let c = test_config();
         let mut t = WorkTimer::new();
         let mut evening = Clock::at(Weekday::Monday, 19, 0);
         assert_eq!(
@@ -263,7 +282,7 @@ mod tests {
 
     #[test]
     fn disabled_day_counts_as_outside_work_hours() {
-        let mut c = Config::default();
+        let mut c = test_config();
         c.schedule.set_enabled(Weekday::Monday, false);
         let mut t = WorkTimer::new();
         let mut monday = Clock::at(Weekday::Monday, 10, 0);
@@ -277,7 +296,7 @@ mod tests {
 
     #[test]
     fn each_slot_start_restarts_the_counter() {
-        let mut c = Config::default();
+        let mut c = test_config();
         c.schedule.monday = vec![slot(9, 0, 13, 0), slot(14, 0, 18, 0)];
         let mut clock = Clock::at(Weekday::Monday, 12, 30);
         let mut t = WorkTimer::new();
@@ -295,7 +314,7 @@ mod tests {
 
     #[test]
     fn idle_threshold_pauses_and_activity_restarts_from_zero() {
-        let c = Config::default(); // idle detection enabled, 5 min
+        let c = test_config(); // idle detection enabled, 5 min
         let mut clock = Clock::at(Weekday::Monday, 10, 0);
         let mut t = WorkTimer::new();
         run(&mut t, &c, &mut clock, 20 * MIN, 0);
@@ -316,7 +335,7 @@ mod tests {
 
     #[test]
     fn idle_is_ignored_when_detection_is_disabled() {
-        let mut c = Config::default();
+        let mut c = test_config();
         c.idle.enabled = false;
         let mut clock = Clock::at(Weekday::Monday, 10, 0);
         let mut t = WorkTimer::new();
@@ -328,7 +347,7 @@ mod tests {
 
     #[test]
     fn disable_for_stops_counting_until_the_deadline_then_restarts() {
-        let c = Config::default();
+        let c = test_config();
         let mut clock = Clock::at(Weekday::Monday, 10, 0);
         let mut t = WorkTimer::new();
         run(&mut t, &c, &mut clock, 20 * MIN, 0); // now 10:20
@@ -345,7 +364,7 @@ mod tests {
 
     #[test]
     fn disable_label_wraps_past_midnight() {
-        let c = Config::default();
+        let c = test_config();
         let clock = Clock::at(Weekday::Monday, 23, 0);
         let mut t = WorkTimer::new();
         t.disable_for(clock.now(), 4 * 60);
@@ -357,7 +376,7 @@ mod tests {
 
     #[test]
     fn reactivate_ends_the_disable_period_and_counts_from_zero() {
-        let c = Config::default();
+        let c = test_config();
         let mut clock = Clock::at(Weekday::Monday, 10, 0);
         let mut t = WorkTimer::new();
         run(&mut t, &c, &mut clock, 20 * MIN, 0);
@@ -370,7 +389,7 @@ mod tests {
 
     #[test]
     fn resume_from_sleep_restarts_from_zero() {
-        let c = Config::default();
+        let c = test_config();
         let mut clock = Clock::at(Weekday::Monday, 10, 0);
         let mut t = WorkTimer::new();
         run(&mut t, &c, &mut clock, 20 * MIN, 0);
@@ -380,7 +399,7 @@ mod tests {
 
     #[test]
     fn a_large_tick_gap_is_treated_as_sleep() {
-        let c = Config::default();
+        let c = test_config();
         let mut clock = Clock::at(Weekday::Monday, 10, 0);
         let mut t = WorkTimer::new();
         run(&mut t, &c, &mut clock, 20 * MIN, 0);
@@ -390,7 +409,7 @@ mod tests {
 
     #[test]
     fn session_lock_pauses_and_unlock_restarts_from_zero() {
-        let c = Config::default();
+        let c = test_config();
         let mut clock = Clock::at(Weekday::Monday, 10, 0);
         let mut t = WorkTimer::new();
         run(&mut t, &c, &mut clock, 20 * MIN, 0);
