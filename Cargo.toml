@@ -15,6 +15,15 @@ windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_Graph
 [dev-dependencies]
 tempfile = "3.27.0"
 
+# Small portable exe: optimize for size, link-time optimization, no unwind
+# tables and no debug symbols (RAM first, CLAUDE.md rule 2).
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
 [build-dependencies]
 slint-build = "1.19"
 winresource = "0.1.34"
