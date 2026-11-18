@@ -14,7 +14,7 @@ Para que arranque con Windows, active **Iniciar con Windows** en la pestaña Gen
 
 | Función | Detalle |
 |---|---|
-| Descansos | Cada cierto tiempo de trabajo (por defecto, 50 minutos) muestra un descanso de unos minutos (por defecto, 5). |
+| Descansos | Cada cierto tiempo de trabajo (por defecto, 33 minutos) muestra un descanso de unos minutos (por defecto, 5). |
 | Tipo de aviso | Pantalla completa en todos los monitores, o solo una notificación de Windows con sonido. |
 | Horarios | Franjas de trabajo por día de la semana; fuera de ellas no hay avisos. Cada día se puede deshabilitar sin borrar sus franjas. |
 | Inactividad | Si no usa el teclado ni el mouse durante unos minutos, el contador se detiene; al volver, empieza de cero y se avisa con una notificación. |
