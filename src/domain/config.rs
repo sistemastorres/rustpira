@@ -252,8 +252,12 @@ pub struct MessageConfig {
 impl Default for MessageConfig {
     fn default() -> Self {
         Self {
-            title: "Tomate un descanso".into(),
-            body: "Levantate, estirá las piernas y mirá a lo lejos.\nRelajá los hombros y respirá profundo."
+            // Default texts as the user wrote them (S22).
+            title: "Es hora de un descanso".into(),
+            body: "Levantate, estirá las piernas y mirá a lo lejos.\n\
+                   Relajá los hombros y respirá profundo.\n\
+                   Respira. Relájate.\n\
+                   y porque no, 5 min de meditación!"
                 .into(),
         }
     }
@@ -275,8 +279,8 @@ impl Default for BreakRules {
     fn default() -> Self {
         Self {
             allow_cancel: true,
-            limit_cancels: false,
-            cancel_limit: 3,
+            limit_cancels: true,
+            cancel_limit: 2,
             postpone_minutes: 5,
             max_postpones: 1,
         }
@@ -371,8 +375,8 @@ impl Default for AppearanceConfig {
                 b: 0x5F,
             },
             image_path: String::new(),
-            opacity: 80,
-            theme: Theme::Light,
+            opacity: 75,
+            theme: Theme::Dark,
         }
     }
 }
@@ -403,7 +407,7 @@ impl Default for Config {
             *schedule.day_mut(day) = office.clone();
         }
         Self {
-            interval_minutes: 50,
+            interval_minutes: 33,
             break_minutes: 5,
             notice: NoticeKind::Lock,
             start_with_windows: false,
@@ -554,20 +558,31 @@ mod tests {
 
     #[test]
     fn defaults_match_the_approved_design() {
+        // Values requested by the user (S22).
         let c = Config::default();
-        assert_eq!(c.interval_minutes, 50);
+        assert_eq!(c.message.title, "Es hora de un descanso");
+        assert_eq!(
+            c.message.body,
+            "Levantate, estirá las piernas y mirá a lo lejos.\n\
+             Relajá los hombros y respirá profundo.\n\
+             Respira. Relájate.\n\
+             y porque no, 5 min de meditación!"
+        );
+        assert_eq!(c.interval_minutes, 33);
         assert_eq!(c.break_minutes, 5);
         assert_eq!(c.notice, NoticeKind::Lock);
         assert!(!c.start_with_windows);
         assert!(c.breaks.allow_cancel);
-        assert!(!c.breaks.limit_cancels);
+        assert!(c.breaks.limit_cancels);
+        assert_eq!(c.breaks.cancel_limit, 2);
         assert_eq!(c.breaks.postpone_minutes, 5);
         assert_eq!(c.breaks.max_postpones, 1);
         assert!(c.idle.enabled);
         assert_eq!(c.idle.minutes, 5);
         assert_eq!(c.appearance.background, Background::Color);
-        assert_eq!(c.appearance.opacity, 80);
-        assert_eq!(c.appearance.theme, Theme::Light);
+        assert_eq!(c.appearance.opacity, 75);
+        assert_eq!(c.appearance.theme, Theme::Dark);
+        assert!(Weekday::ALL.iter().all(|d| c.schedule.is_enabled(*d)));
         assert_eq!(c.sound.source, SoundSource::Builtin);
         assert_eq!(c.sound.builtin, 1);
         assert_eq!(c.sound.volume, 50);
@@ -736,7 +751,7 @@ mod tests {
         c.schedule.saturday = vec![slot((10, 0), (12, 30))];
 
         let text = c.to_toml();
-        assert!(text.contains("interval_minutes = 50"), "{text}");
+        assert!(text.contains("interval_minutes = 33"), "{text}");
         assert!(text.contains("\"09:00\""), "{text}");
         assert_eq!(Config::from_toml(&text).unwrap(), c);
     }
