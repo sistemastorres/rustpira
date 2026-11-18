@@ -1,0 +1,80 @@
+// "Acerca de" (design §5.8). Created when opened, destroyed when closed.
+
+import { AboutSlint, Button, Palette } from "std-widgets.slint";
+
+export component About inherits Window {
+    in property <string> version;
+    // Empty when the package has no repository URL: the link is hidden.
+    in property <string> repository;
+    in property <int> theme-index; // 0 = claro, 1 = oscuro
+
+    callback open-repository();
+    callback close-clicked();
+
+    title: "Rustpira - Acerca de";
+    icon: @image-url("../recursos/rustpira-256.png");
+    width: 380px;
+
+    init => {
+        Palette.color-scheme = root.theme-index == 1 ? ColorScheme.dark : ColorScheme.light;
+    }
+
+    VerticalLayout {
+        padding: 20px;
+        spacing: 10px;
+        alignment: start;
+
+        HorizontalLayout {
+            alignment: center;
+            Image {
+                source: @image-url("../recursos/rustpira-256.png");
+                width: 96px;
+                height: 96px;
+            }
+        }
+        Text {
+            text: "Rustpira";
+            font-size: 22px;
+            font-weight: 700;
+            horizontal-alignment: center;
+        }
+        Text {
+            text: "Versión " + root.version;
+            horizontal-alignment: center;
+        }
+        Text {
+            text: "Recordatorio de descansos para Windows 10 y 11.";
+            horizontal-alignment: center;
+            wrap: word-wrap;
+        }
+        Text {
+            text: "Software libre bajo la licencia MIT.";
+            horizontal-alignment: center;
+            color: Palette.foreground.with-alpha(0.7);
+        }
+        if root.repository != "": HorizontalLayout {
+            alignment: center;
+            Text {
+                text: root.repository;
+                color: Palette.accent-background;
+                accessible-role: button;
+                accessible-label: "Abrir el repositorio en el navegador";
+                TouchArea {
+                    mouse-cursor: pointer;
+                    clicked => { root.open-repository(); }
+                }
+            }
+        }
+        AboutSlint {
+            preferred-height: 120px;
+        }
+        HorizontalLayout {
+            alignment: end;
+            Button {
+                text: "Cerrar";
+                primary: true;
+                clicked => { root.close-clicked(); }
+            }
+        }
+    }
+}

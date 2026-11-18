@@ -8,8 +8,9 @@ use std::path::PathBuf;
 use std::rc::{Rc, Weak};
 use std::time::Duration;
 
+use crate::about::AboutWindow;
 use crate::break_screen::BreakScreen;
-use crate::domain::config::Config;
+use crate::domain::config::{Config, Theme};
 use crate::domain::engine::{BreakView, Effect, Engine};
 use crate::platform::autostart;
 use crate::platform::notify;
@@ -29,6 +30,7 @@ struct App {
     session_locked: Cell<bool>,
     break_screen: RefCell<Option<BreakScreen>>,
     settings: RefCell<Option<SettingsWindow>>,
+    about: RefCell<Option<AboutWindow>>,
     config_path: PathBuf,
     player: Player,
     this: Weak<App>,
@@ -68,6 +70,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         session_locked: Cell::new(false),
         break_screen: RefCell::new(None),
         settings: RefCell::new(None),
+        about: RefCell::new(None),
         config_path,
         player: Player::new(),
         this: this.clone(),
@@ -124,9 +127,11 @@ fn wire_tray(app: &Rc<App>) {
         }
     });
 
-    app.tray.on_about(|| {
-        // T9: "Acerca de" window.
-        eprintln!("[rustpira] acerca de: pendiente (T9)");
+    let weak = Rc::downgrade(app);
+    app.tray.on_about(move || {
+        if let Some(app) = weak.upgrade() {
+            app.open_about();
+        }
     });
 
     let weak = Rc::downgrade(app);
@@ -316,6 +321,30 @@ impl App {
         match opened {
             Ok(window) => *self.settings.borrow_mut() = Some(window),
             Err(e) => eprintln!("[rustpira] no se pudo abrir la configuración: {e}"),
+        }
+    }
+
+    /// Opens "Acerca de", or brings it to the front if it is open. Allowed
+    /// during a break (design §5.1): it changes nothing.
+    fn open_about(&self) {
+        if let Some(open) = self.about.borrow().as_ref() {
+            open.bring_to_front();
+            return;
+        }
+        let dark = self.config.borrow().appearance.theme == Theme::Dark;
+        let weak = self.this.clone();
+        let on_close = Box::new(move || {
+            let weak = weak.clone();
+            // Dropped on the next turn: this runs inside the window's own callback.
+            slint::Timer::single_shot(Duration::ZERO, move || {
+                if let Some(app) = weak.upgrade() {
+                    app.about.borrow_mut().take();
+                }
+            });
+        });
+        match AboutWindow::open(dark, on_close) {
+            Ok(window) => *self.about.borrow_mut() = Some(window),
+            Err(e) => eprintln!("[rustpira] no se pudo abrir «Acerca de»: {e}"),
         }
     }
 

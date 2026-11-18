@@ -116,6 +116,42 @@ pub fn foreground_is_ours() -> bool {
     process_id == unsafe { GetCurrentProcessId() }
 }
 
+/// An `https://` address with a host and no spaces: the only kind of link
+/// "Acerca de" opens, so the shell never runs a program or a local file.
+pub fn is_web_url(url: &str) -> bool {
+    url.strip_prefix("https://").is_some_and(|rest| {
+        let host = rest.split('/').next().unwrap_or_default();
+        !host.is_empty() && !url.chars().any(|c| c.is_whitespace() || c.is_control())
+    })
+}
+
+/// Opens a web link in the default browser. Returns false if the text is
+/// not a web link or Windows could not open it.
+pub fn open_url(url: &str) -> bool {
+    use windows_sys::Win32::UI::Shell::ShellExecuteW;
+    use windows_sys::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+
+    if !is_web_url(url) {
+        return false;
+    }
+    let wide = |text: &str| -> Vec<u16> { text.encode_utf16().chain([0]).collect() };
+    let (verb, target) = (wide("open"), wide(url));
+    // SAFETY: both strings are null-terminated and outlive the call; null
+    // parameters and directory are allowed.
+    let result = unsafe {
+        ShellExecuteW(
+            std::ptr::null_mut(),
+            verb.as_ptr(),
+            target.as_ptr(),
+            std::ptr::null(),
+            std::ptr::null(),
+            SW_SHOWNORMAL,
+        )
+    };
+    // Values above 32 mean success.
+    result as isize > 32
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -125,6 +161,22 @@ mod tests {
     #[test]
     fn foreground_window_of_another_process_is_not_ours() {
         assert!(!foreground_is_ours());
+    }
+
+    #[test]
+    fn only_https_addresses_count_as_web_links() {
+        assert!(is_web_url("https://github.com/usuario/rustpira"));
+        assert!(!is_web_url(""));
+        assert!(!is_web_url("http://example.com"));
+        assert!(!is_web_url("file:///C:/Windows/System32/cmd.exe"));
+        assert!(!is_web_url("C:\\Windows\\System32\\cmd.exe"));
+        assert!(!is_web_url("https://"));
+        assert!(!is_web_url("https://a b"));
+    }
+
+    #[test]
+    fn open_url_refuses_anything_but_web_links() {
+        assert!(!open_url("calc.exe"));
     }
 
     #[test]

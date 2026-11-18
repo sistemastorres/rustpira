@@ -31,6 +31,7 @@ pub mod ui {
     slint::include_modules!();
 }
 
+pub mod about;
 pub mod app;
 pub mod audio;
 pub mod break_screen;
