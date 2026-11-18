@@ -49,6 +49,8 @@ pub enum Effect {
     ShowNotification,
     /// The consecutive-cancel counter changed and must be persisted.
     CancelCountChanged(u8),
+    /// Activity came back after an idle pause; the interval started over.
+    IdleEnded,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -103,7 +105,11 @@ impl Engine {
             } if now.mono_secs >= until => self.start_break(config, now, postpones_used),
             Phase::Postponed { .. } => Vec::new(),
             Phase::Working => {
+                let was_idle = self.last_status == TimerStatus::IdlePaused;
                 self.last_status = self.timer.tick(config, now, idle_secs);
+                if was_idle && matches!(self.last_status, TimerStatus::Counting { .. }) {
+                    return vec![Effect::IdleEnded];
+                }
                 if self.last_status != TimerStatus::BreakDue {
                     return Vec::new();
                 }
@@ -552,6 +558,34 @@ mod tests {
         assert_eq!(effects, vec![Effect::ShowNotification]);
         assert_eq!(view(&e, &c, &clock), None);
         assert_eq!(tooltip(&e, &c, &clock), "Siguiente descanso en 00:50:00");
+    }
+
+    #[test]
+    fn activity_after_an_idle_pause_is_announced_once() {
+        let c = Config::default(); // idle pause after 5 min
+        let mut clock = Clock::new();
+        let mut e = Engine::new(0);
+        run(&mut e, &c, &mut clock, 60);
+
+        clock.jump(1);
+        assert_eq!(e.tick(&c, clock.now(), 5 * MIN), vec![]);
+        clock.jump(1);
+        assert_eq!(e.tick(&c, clock.now(), 5 * MIN + 1), vec![]);
+
+        clock.jump(1);
+        assert_eq!(e.tick(&c, clock.now(), 0), vec![Effect::IdleEnded]);
+        assert_eq!(tooltip(&e, &c, &clock), "Siguiente descanso en 00:50:00");
+        clock.jump(1);
+        assert_eq!(e.tick(&c, clock.now(), 0), vec![]);
+    }
+
+    #[test]
+    fn plain_counting_never_announces_idle_end() {
+        let c = Config::default();
+        let mut clock = Clock::new();
+        let mut e = Engine::new(0);
+        let effects = run(&mut e, &c, &mut clock, 10 * MIN);
+        assert!(!effects.contains(&Effect::IdleEnded));
     }
 
     #[test]

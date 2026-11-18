@@ -254,6 +254,15 @@ impl App {
                         self.player.play(&config.sound);
                     }
                 }
+                Effect::IdleEnded => {
+                    let minutes = self.config.borrow().interval_minutes;
+                    notify_or_log(
+                        "Rustpira",
+                        &format!(
+                            "Se detectó actividad otra vez. El contador volvió a empezar: el próximo descanso es en {minutes} min."
+                        ),
+                    );
+                }
                 Effect::ShowNotification => {
                     let config = self.config.borrow();
                     notify_or_log(&config.message.title, &config.message.body);
