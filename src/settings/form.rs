@@ -217,6 +217,14 @@ impl Form {
         }
 
         config.validate().map_err(|e| e.to_string())?;
+        // Checked here and not in `Config::validate`, so a hand-edited file
+        // that was valid before keeps loading (L18).
+        if config.idle.enabled && config.idle.minutes > config.interval_minutes {
+            return Err(format!(
+                "Los minutos sin actividad ({}) no pueden superar el intervalo entre descansos ({} min).",
+                config.idle.minutes, config.interval_minutes
+            ));
+        }
         Ok(config)
     }
 
@@ -455,6 +463,29 @@ mod tests {
         assert_eq!(
             form.to_config(),
             Err("«Intervalo (min)» debe estar entre 1 y 240 (valor actual: 0).".into())
+        );
+    }
+
+    #[test]
+    fn idle_minutes_cannot_exceed_the_interval() {
+        let mut form = Form::from_config(&Config::default());
+        form.interval_minutes = 25;
+        form.idle_enabled = true;
+        form.idle_minutes = 30;
+        assert_eq!(
+            form.to_config(),
+            Err(
+                "Los minutos sin actividad (30) no pueden superar el intervalo entre descansos (25 min)."
+                    .into()
+            )
+        );
+        form.idle_minutes = 25;
+        assert!(form.to_config().is_ok());
+        form.idle_minutes = 30;
+        form.idle_enabled = false;
+        assert!(
+            form.to_config().is_ok(),
+            "only checked when idle pause is on"
         );
     }
 
