@@ -43,7 +43,7 @@ Pronóstico: alrededor de 3500 líneas escritas en total. Ruta: todas inline; no
 | T7 | Modo notificación y sonido (sonidos incluidos, `.wav` propio, volumen, Probar) | S5, S8 | inline | hecho; la notificación queda por verificar en una VM (L16) | `bf36856` (evidencia en L15–L16) |
 | T8 | Ventana de configuración con pestañas, tema Claro/Oscuro, arranque con Windows, aplicar al guardar | S5–S8, S10–S13, S16 | inline | hecho (verificado por el usuario, L18) | `bca20ff`, `1344e5f`, `78031a9`, `2ddff9b` (evidencia en L17) |
 | T10 | Ajustes de la ventana de configuración: Horarios con símbolos, interruptor por día y flechas de hora; inactividad ≤ intervalo; aviso al volver de la inactividad; controles numéricos más angostos | S17–S20 | inline | hecho; falta la verificación del usuario | `9ef5625`, `5e54655`, `2c3199f`, `8d32f7e` (evidencia en L19) |
-| T9 | Acerca de, README en español (incluye las salidas aceptadas del bloqueo duro: Ctrl+Alt+Supr y el menú Inicio con la tecla Win, ver L13), build release, medición final de RAM y prueba del exe final en una VM con Windows 10 sin modificar (notificaciones, L16) | S1, S14, S16 | inline | pendiente | — |
+| T9 | Acerca de, README en español (incluye las salidas aceptadas del bloqueo duro: Ctrl+Alt+Supr y el menú Inicio con la tecla Win, ver L13), build release, medición final de RAM y prueba del exe final en una VM con Windows 10 sin modificar (notificaciones, L16) | S1, S14, S16 | inline | en curso: faltan la URL del repositorio, la medición de RAM del release y la prueba en la VM | `f03fb66`, `1ff548b`, `01c8a7a` (evidencia en L20) |
 
 ## Log
 
@@ -109,4 +109,9 @@ Pronóstico: alrededor de 3500 líneas escritas en total. Ruta: todas inline; no
   - `2c3199f` (S19): `Effect::IdleEnded` al pasar de la pausa por inactividad a contar; la app muestra "Se detectó actividad otra vez. El contador volvió a empezar: el próximo descanso es en N min." Depende de que las notificaciones se vean (L16). RED: 1 de 2 tests.
   - `8d32f7e` (S20): campos numéricos de 120 px en General y Descanso.
   Checks: `cargo test` 102/102, clippy y fmt ok. La prueba de humo de la ventana no se pudo correr en esta sesión (permiso denegado); la verificación visual queda para el usuario.
-- **Siguiente paso:** verificación de T10 por el usuario; después T9.
+- **L20 (2026-11-17) — T9, textual:** "segui con T9". T10 no tuvo una verificación explícita: el usuario pidió seguir. Tres commits:
+  - `f03fb66`: ventana "Acerca de" (`ui/about.slint`, `src/about.rs`): ícono, versión, "Software libre bajo la licencia MIT.", enlace al repositorio y el widget `AboutSlint`, que cumple la mención que pide la licencia gratuita de Slint. Disponible también durante un descanso (diseño §5.1). Versión y repositorio salen de `Cargo.toml`; el enlace no se muestra mientras `repository` no esté definido, y solo se abren direcciones `https://` (`system::open_url`). RED: 1 de 2 tests.
+  - `1ff548b`: perfil release (`opt-level = "s"`, LTO, `codegen-units = 1`, `panic = "abort"`, `strip`). Exe de 15,03 MB a 9,11 MB.
+  - `01c8a7a`: `README.md` en español con el inicio rápido, las funciones, el menú, las salidas del descanso obligatorio (Ctrl+Alt+Supr, tecla Windows y menú Inicio, Administrador de tareas), los archivos, cómo desinstalar, cómo compilar y la licencia.
+  Checks: `cargo test` 104/104, clippy y fmt ok. La medición de RAM del release no se pudo hacer: la versión de depuración estaba abierta (instancia única) y correr la prueba de humo quedó sin permiso en esta sesión.
+- **Siguiente paso:** el usuario pasa la URL del repositorio público, mide la RAM del release y prueba el exe en la VM con Windows 10 (notificaciones).
