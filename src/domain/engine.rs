@@ -19,6 +19,9 @@ pub struct BreakView {
     pub hard: bool,
     pub can_cancel: bool,
     pub can_postpone: bool,
+    /// "Terminar descanso": replaces "Cancelar" once enough of the break
+    /// went by; it ends the break as completed.
+    pub can_finish: bool,
     pub postpone_minutes: u32,
 }
 
@@ -144,14 +147,19 @@ impl Engine {
                 ends_at,
                 hard,
                 postpones_used,
-            } => Some(BreakView {
-                remaining_secs: ends_at.saturating_sub(now.mono_secs),
-                total_secs: u64::from(config.break_minutes) * 60,
-                hard,
-                can_cancel: rules.allow_cancel && !hard,
-                can_postpone: !hard && postpones_used < rules.max_postpones,
-                postpone_minutes: rules.postpone_minutes,
-            }),
+            } => {
+                let remaining_secs = ends_at.saturating_sub(now.mono_secs);
+                let can_finish = can_finish(config, hard, remaining_secs);
+                Some(BreakView {
+                    remaining_secs,
+                    total_secs: break_secs(config),
+                    hard,
+                    can_cancel: rules.allow_cancel && !hard && !can_finish,
+                    can_postpone: !hard && !can_finish && postpones_used < rules.max_postpones,
+                    can_finish,
+                    postpone_minutes: rules.postpone_minutes,
+                })
+            }
             _ => None,
         };
 
@@ -223,6 +231,17 @@ impl Engine {
             postpones_used: postpones_used + 1,
         };
         vec![Effect::BreakEnded { completed: false }]
+    }
+
+    /// "Terminar descanso". Ignored when not offered.
+    pub fn finish(&mut self, config: &Config, now: Now) -> Vec<Effect> {
+        let Phase::OnBreak { ends_at, hard, .. } = self.phase else {
+            return Vec::new();
+        };
+        if !can_finish(config, hard, ends_at.saturating_sub(now.mono_secs)) {
+            return Vec::new();
+        }
+        self.complete_break(config)
     }
 
     /// "Desactivar recordatorios". Ignored while a break is on screen; drops
@@ -309,6 +328,22 @@ impl Engine {
     }
 }
 
+fn break_secs(config: &Config) -> u64 {
+    u64::from(config.break_minutes) * 60
+}
+
+/// "Terminar descanso" is offered once `finish_percent` of the break went by,
+/// only where cancelling is allowed and never in a hard lock (S25).
+fn can_finish(config: &Config, hard: bool, remaining_secs: u64) -> bool {
+    let rules = &config.breaks;
+    let total = break_secs(config);
+    let elapsed = total.saturating_sub(remaining_secs);
+    !hard
+        && rules.allow_cancel
+        && rules.finish_percent < 100
+        && elapsed * 100 >= total * u64::from(rules.finish_percent)
+}
+
 fn hh_mm_ss(secs: u64) -> String {
     format!(
         "{:02}:{:02}:{:02}",
@@ -341,6 +376,7 @@ mod tests {
         c.breaks.cancel_limit = 3;
         c.breaks.postpone_minutes = 5;
         c.breaks.max_postpones = 1;
+        c.breaks.finish_percent = 100;
         c.idle.enabled = true;
         c.idle.minutes = 5;
         c
@@ -418,6 +454,7 @@ mod tests {
                 hard: false,
                 can_cancel: true,
                 can_postpone: true,
+                can_finish: false,
                 postpone_minutes: 5,
             })
         );
@@ -448,6 +485,7 @@ mod tests {
             hard: false,
             can_cancel: false,
             can_postpone: false,
+            can_finish: false,
             postpone_minutes: 5,
         };
         assert_eq!(view.fraction_left(), 0.0);
@@ -565,6 +603,94 @@ mod tests {
             reach_break(&mut e, &c, &mut clock);
             assert!(view(&e, &c, &clock).unwrap().can_cancel);
             e.cancel(&c);
+        }
+    }
+
+    /// S25 setup: 5-minute break that can be finished after 60% (180 s).
+    fn finish_config() -> Config {
+        let mut c = test_config();
+        c.breaks.finish_percent = 60;
+        c
+    }
+
+    #[test]
+    fn cancel_becomes_finish_and_postpone_goes_away_after_the_percentage() {
+        let c = finish_config();
+        let mut clock = Clock::new();
+        let mut e = Engine::new(0);
+        reach_break(&mut e, &c, &mut clock);
+
+        run(&mut e, &c, &mut clock, 179);
+        let before = view(&e, &c, &clock).unwrap();
+        assert!(before.can_cancel && before.can_postpone && !before.can_finish);
+
+        run(&mut e, &c, &mut clock, 1);
+        let after = view(&e, &c, &clock).unwrap();
+        assert!(after.can_finish);
+        assert!(!after.can_cancel, "Terminar replaces Cancelar");
+        assert!(!after.can_postpone, "Posponer disappears");
+    }
+
+    #[test]
+    fn finish_is_ignored_before_the_percentage() {
+        let c = finish_config();
+        let mut clock = Clock::new();
+        let mut e = Engine::new(0);
+        reach_break(&mut e, &c, &mut clock);
+        run(&mut e, &c, &mut clock, 179);
+
+        assert_eq!(e.finish(&c, clock.now()), vec![]);
+        assert!(view(&e, &c, &clock).is_some());
+    }
+
+    #[test]
+    fn finish_counts_as_a_completed_break_and_resets_the_cancel_counter() {
+        let c = finish_config();
+        let mut clock = Clock::new();
+        let mut e = Engine::new(1);
+        reach_break(&mut e, &c, &mut clock);
+        run(&mut e, &c, &mut clock, 180);
+
+        assert_eq!(
+            e.finish(&c, clock.now()),
+            vec![
+                Effect::BreakEnded { completed: true },
+                Effect::CancelCountChanged(0)
+            ]
+        );
+        assert_eq!(e.consecutive_cancels(), 0);
+        assert!(view(&e, &c, &clock).is_none());
+        assert_eq!(tooltip(&e, &c, &clock), "Siguiente descanso en 00:50:00");
+    }
+
+    #[test]
+    fn a_hard_break_is_never_finished_early() {
+        let mut c = finish_config();
+        c.breaks.limit_cancels = true;
+        c.breaks.cancel_limit = 1;
+        let mut clock = Clock::new();
+        let mut e = Engine::new(1);
+        reach_break(&mut e, &c, &mut clock);
+        run(&mut e, &c, &mut clock, 299);
+
+        assert!(!view(&e, &c, &clock).unwrap().can_finish);
+        assert_eq!(e.finish(&c, clock.now()), vec![]);
+        assert!(view(&e, &c, &clock).is_some());
+    }
+
+    #[test]
+    fn finish_is_not_offered_at_100_percent_nor_when_cancel_is_disallowed() {
+        for (percent, allow_cancel) in [(100, true), (60, false)] {
+            let mut c = finish_config();
+            c.breaks.finish_percent = percent;
+            c.breaks.allow_cancel = allow_cancel;
+            let mut clock = Clock::new();
+            let mut e = Engine::new(0);
+            reach_break(&mut e, &c, &mut clock);
+            run(&mut e, &c, &mut clock, 299);
+
+            assert!(!view(&e, &c, &clock).unwrap().can_finish, "{percent}");
+            assert_eq!(e.finish(&c, clock.now()), vec![], "{percent}");
         }
     }
 

@@ -27,6 +27,7 @@ impl BreakScreen {
         view: &BreakView,
         on_cancel: Rc<dyn Fn()>,
         on_postpone: Rc<dyn Fn()>,
+        on_finish: Rc<dyn Fn()>,
     ) -> Result<Self, slint::PlatformError> {
         let appearance = &config.appearance;
         let image = match appearance.background {
@@ -54,6 +55,8 @@ impl BreakScreen {
             window.on_cancel(move || cancel());
             let postpone = on_postpone.clone();
             window.on_postpone(move || postpone());
+            let finish = on_finish.clone();
+            window.on_finish(move || finish());
             // Alt+F4 or any other close request must not end the break.
             window
                 .window()
@@ -105,6 +108,7 @@ impl BreakScreen {
             window.set_hard(view.hard);
             window.set_can_cancel(view.can_cancel);
             window.set_can_postpone(view.can_postpone);
+            window.set_can_finish(view.can_finish);
             window.set_postpone_label(format!("Posponer {} min", view.postpone_minutes).into());
             if refocus && window.get_primary() {
                 window.window().with_winit_window(|w| w.focus_window());

@@ -101,6 +101,7 @@ fn load(window: &Settings, form: &Form) {
     window.set_cancel_limit(form.cancel_limit);
     window.set_postpone_minutes(form.postpone_minutes);
     window.set_max_postpones(form.max_postpones);
+    window.set_finish_percent(form.finish_percent);
     window.set_idle_enabled(form.idle_enabled);
     window.set_idle_minutes(form.idle_minutes);
     window.set_background_index(i32::from(form.background_image));
@@ -136,6 +137,7 @@ fn read(window: &Settings, form: &mut Form) {
     form.cancel_limit = window.get_cancel_limit();
     form.postpone_minutes = window.get_postpone_minutes();
     form.max_postpones = window.get_max_postpones();
+    form.finish_percent = window.get_finish_percent();
     form.idle_enabled = window.get_idle_enabled();
     form.idle_minutes = window.get_idle_minutes();
     form.background_image = window.get_background_index() == 1;

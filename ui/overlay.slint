@@ -1,7 +1,44 @@
 // Break screen (design §5.3). One instance per monitor; only the one on the
 // primary monitor shows the content. Color or image share one opacity.
 
-import { Button } from "std-widgets.slint";
+// Pill-shaped button for the break screen (S26): larger text, a solid
+// white fill for the main action and a translucent outline for the other.
+component PillButton inherits Rectangle {
+    in property <string> text;
+    in property <bool> main: false;
+    callback clicked();
+
+    min-width: 220px;
+    height: 54px;
+    border-radius: self.height / 2;
+    border-width: root.main ? 0px : 2px;
+    border-color: #ffffffb3;
+    background: root.main
+        ? (touch.pressed ? #ffffffbf : touch.has-hover ? #ffffffe6 : #ffffff)
+        : (touch.pressed ? #ffffff4d : touch.has-hover ? #ffffff33 : #ffffff1a);
+    animate background { duration: 120ms; }
+    accessible-role: button;
+    accessible-label: root.text;
+    accessible-action-default => { root.clicked(); }
+
+    HorizontalLayout {
+        padding-left: 32px;
+        padding-right: 32px;
+        Text {
+            text: root.text;
+            font-size: 19px;
+            font-weight: 600;
+            color: root.main ? #1f2937 : white;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+    }
+
+    touch := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+}
 
 export component BreakOverlay inherits Window {
     in property <bool> primary: false;
@@ -17,10 +54,13 @@ export component BreakOverlay inherits Window {
     in property <bool> hard: false;
     in property <bool> can-cancel: false;
     in property <bool> can-postpone: false;
+    // "Terminar descanso" replaces "Cancelar" late in the break (S25).
+    in property <bool> can-finish: false;
     in property <string> postpone-label;
 
     callback cancel();
     callback postpone();
+    callback finish();
 
     title: "Rustpira - descanso";
     icon: @image-url("../recursos/rustpira-256.png");
@@ -118,13 +158,19 @@ export component BreakOverlay inherits Window {
                     HorizontalLayout {
                         alignment: center;
                         spacing: 16px;
-                        if root.can-postpone: Button {
+                        if root.can-postpone: PillButton {
                             text: root.postpone-label;
                             clicked => { root.postpone(); }
                         }
-                        if root.can-cancel: Button {
+                        if root.can-cancel: PillButton {
                             text: "Cancelar descanso";
+                            main: true;
                             clicked => { root.cancel(); }
+                        }
+                        if root.can-finish: PillButton {
+                            text: "Terminar descanso";
+                            main: true;
+                            clicked => { root.finish(); }
                         }
                     }
                 }

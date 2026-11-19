@@ -55,6 +55,7 @@ pub struct Form {
     pub cancel_limit: i32,
     pub postpone_minutes: i32,
     pub max_postpones: i32,
+    pub finish_percent: i32,
     pub idle_enabled: bool,
     pub idle_minutes: i32,
     // Apariencia
@@ -142,6 +143,7 @@ impl Form {
             cancel_limit: config.breaks.cancel_limit.into(),
             postpone_minutes: config.breaks.postpone_minutes as i32,
             max_postpones: config.breaks.max_postpones.into(),
+            finish_percent: config.breaks.finish_percent.into(),
             idle_enabled: config.idle.enabled,
             idle_minutes: config.idle.minutes as i32,
             background_image: appearance.background == Background::Image,
@@ -202,6 +204,7 @@ impl Form {
         config.breaks.cancel_limit = to_u8(self.cancel_limit);
         config.breaks.postpone_minutes = to_u32(self.postpone_minutes);
         config.breaks.max_postpones = to_u8(self.max_postpones);
+        config.breaks.finish_percent = to_u8(self.finish_percent);
         config.idle.enabled = self.idle_enabled;
         config.idle.minutes = to_u32(self.idle_minutes);
 
@@ -360,6 +363,7 @@ mod tests {
         c.breaks.cancel_limit = 2;
         c.breaks.postpone_minutes = 10;
         c.breaks.max_postpones = 3;
+        c.breaks.finish_percent = 90;
         c.idle.enabled = false;
         c.idle.minutes = 15;
         c.appearance.background = Background::Image;

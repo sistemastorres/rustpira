@@ -179,6 +179,7 @@ export component Settings inherits Window {
     in-out property <int> cancel-limit;
     in-out property <int> postpone-minutes;
     in-out property <int> max-postpones;
+    in-out property <int> finish-percent;
     in-out property <bool> idle-enabled;
     in-out property <int> idle-minutes;
     // Apariencia
@@ -405,6 +406,18 @@ export component Settings inherits Window {
                     }
                     Hint {
                         text: "Al llegar al límite, el próximo descanso es obligatorio: se muestra sin botones hasta que termina.";
+                    }
+                    HorizontalLayout {
+                        Label { text: "Terminar el descanso desde (%)"; }
+                        NumberBox {
+                            enabled: root.allow-cancel;
+                            minimum: 50;
+                            maximum: 100;
+                            value <=> root.finish-percent;
+                        }
+                    }
+                    Hint {
+                        text: "Pasado ese porcentaje del descanso, «Cancelar descanso» cambia a «Terminar descanso», que lo cuenta como completo, y desaparece «Posponer». Con 100 % no se ofrece. El descanso obligatorio siempre se cumple entero.";
                     }
                     HorizontalLayout {
                         Label { text: "Posponer (min)"; }

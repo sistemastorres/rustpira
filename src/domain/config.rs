@@ -288,6 +288,9 @@ pub struct BreakRules {
     pub postpone_minutes: u32,
     /// Postpones allowed per break, 0..=3. Zero hides the button.
     pub max_postpones: u8,
+    /// Share of the break, 50..=100, after which "Cancelar descanso" becomes
+    /// "Terminar descanso". 100 never offers it.
+    pub finish_percent: u8,
 }
 
 impl Default for BreakRules {
@@ -298,6 +301,7 @@ impl Default for BreakRules {
             cancel_limit: 2,
             postpone_minutes: 5,
             max_postpones: 1,
+            finish_percent: 75,
         }
     }
 }
@@ -495,7 +499,7 @@ impl std::error::Error for ConfigError {}
 impl Config {
     /// Checks every rule; returns the first violation found.
     pub fn validate(&self) -> Result<(), ConfigError> {
-        let ranges: [(&'static str, u32, u32, u32); 9] = [
+        let ranges: [(&'static str, u32, u32, u32); 10] = [
             ("Intervalo (min)", self.interval_minutes, 1, 240),
             ("Duración del descanso (min)", self.break_minutes, 1, 60),
             (
@@ -510,6 +514,12 @@ impl Config {
                 self.breaks.max_postpones.into(),
                 0,
                 3,
+            ),
+            (
+                "Terminar el descanso desde (%)",
+                self.breaks.finish_percent.into(),
+                50,
+                100,
             ),
             ("Inactividad (min)", self.idle.minutes, 1, 120),
             (
@@ -679,6 +689,30 @@ mod tests {
             c.validate().unwrap_err().to_string(),
             "«Posponer hasta (veces)» debe estar entre 0 y 3 (valor actual: 4)."
         );
+    }
+
+    #[test]
+    fn finish_percent_defaults_to_75_and_is_limited_to_50_through_100() {
+        // S25: "no puede ser inferior al 50% y maximo 100%".
+        let mut c = Config::default();
+        assert_eq!(c.breaks.finish_percent, 75);
+        for ok in [50, 75, 100] {
+            c.breaks.finish_percent = ok;
+            assert_eq!(c.validate(), Ok(()), "{ok}");
+        }
+        c.breaks.finish_percent = 49;
+        assert_eq!(
+            c.validate().unwrap_err().to_string(),
+            "«Terminar el descanso desde (%)» debe estar entre 50 y 100 (valor actual: 49)."
+        );
+        c.breaks.finish_percent = 101;
+        assert!(c.validate().is_err());
+    }
+
+    #[test]
+    fn a_config_without_finish_percent_uses_the_default() {
+        let c = Config::from_toml("[breaks]\nallow_cancel = true\n").unwrap();
+        assert_eq!(c.breaks.finish_percent, 75);
     }
 
     #[test]

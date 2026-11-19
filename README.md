@@ -19,7 +19,8 @@ Para que arranque con Windows, active **Iniciar con Windows** en la pestaña Gen
 | Horarios | Franjas de trabajo por día de la semana; fuera de ellas no hay avisos. Cada día se puede deshabilitar sin borrar sus franjas. |
 | Inactividad | Si no usa el teclado ni el mouse durante unos minutos, el contador se detiene; al volver, empieza de cero y se avisa con una notificación. |
 | Cancelar y posponer | Se puede permitir cancelar el descanso, limitar las cancelaciones seguidas y posponerlo unos minutos, hasta 3 veces. |
-| Descanso obligatorio | Al llegar al límite de cancelaciones, el siguiente descanso se muestra sin botones hasta que termina. |
+| Terminar descanso | Pasado un porcentaje del descanso (por defecto, 75 %; entre 50 y 100), el botón **Cancelar descanso** cambia a **Terminar descanso**, que lo cuenta como completo, y desaparece **Posponer**. Con 100 % no se ofrece. |
+| Descanso obligatorio | Al llegar al límite de cancelaciones, el siguiente descanso se muestra sin botones hasta que termina; tampoco ofrece **Terminar descanso**. |
 | Aspecto | Fondo de color o una imagen propia (PNG o JPG), con opacidad ajustable. Tema claro u oscuro para las ventanas. |
 | Sonido | Cuatro sonidos incluidos o un archivo `.wav` propio, con volumen. |
 

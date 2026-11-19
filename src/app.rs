@@ -216,7 +216,8 @@ impl App {
                 let config = self.config.borrow();
                 let cancel = self.deferred(App::cancel_break);
                 let postpone = self.deferred(App::postpone_break);
-                match BreakScreen::open(&config, &view, cancel, postpone) {
+                let finish = self.deferred(App::finish_break);
+                match BreakScreen::open(&config, &view, cancel, postpone, finish) {
                     Ok(opened) => *screen = Some(opened),
                     Err(e) => eprintln!("[rustpira] no se pudo abrir la pantalla de descanso: {e}"),
                 }
@@ -254,6 +255,15 @@ impl App {
         let effects = {
             let config = self.config.borrow();
             self.engine.borrow_mut().postpone(&config, system::now())
+        };
+        self.apply(&effects);
+        self.refresh();
+    }
+
+    fn finish_break(&self) {
+        let effects = {
+            let config = self.config.borrow();
+            self.engine.borrow_mut().finish(&config, system::now())
         };
         self.apply(&effects);
         self.refresh();
