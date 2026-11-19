@@ -53,7 +53,7 @@ Pronóstico: alrededor de 3500 líneas escritas en total. Ruta: todas inline; no
 | T11 | Acerca de con los datos del desarrollador, ventana e ícono más grandes, sin el widget de Slint (insignia en el README); nuevos valores por defecto | S21, S22 | inline | hecho; falta la verificación del usuario | `5cc939b`, `9ffcdf3`, `dbb5fa2`, `c5b4252` (evidencia en L22) |
 | T12 | Pantalla de descanso: recuadro con esquinas redondeadas y barra de progreso descendente | S23 | inline | hecho; falta la verificación del usuario | `d984f23` (evidencia en L22) |
 | T13 | Acción configurable del doble clic en el ícono: abrir la configuración, empezar un descanso, pausar 30 minutos (otro doble clic reactiva) | S24 | inline | hecho; falta la verificación del usuario | `337278e` (evidencia en L22) |
-| T14 | "Terminar descanso" a partir de un porcentaje configurable (50–100 %), sin Posponer desde ese momento y nunca en el bloqueo duro; botones de la pantalla de descanso más grandes y con colores que combinen | S25, S26 | inline | hecho; falta verificación visual del usuario | ver L24 |
+| T14 | "Terminar descanso" a partir de un porcentaje configurable (50–100 %), sin Posponer desde ese momento y nunca en el bloqueo duro; botones de la pantalla de descanso más grandes y con colores que combinen | S25, S26 | inline | hecho; falta verificación visual del usuario | 33367cb (L24) |
 
 ## Log
 
