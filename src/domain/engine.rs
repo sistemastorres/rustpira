@@ -123,19 +123,22 @@ impl Engine {
             Phase::Working => {
                 let was_idle = self.last_status == TimerStatus::IdlePaused;
                 self.last_status = self.timer.tick(config, now, idle_secs);
+                let mut effects = Vec::new();
                 if was_idle && matches!(self.last_status, TimerStatus::Counting { .. }) {
-                    return vec![Effect::IdleEnded];
+                    effects.push(Effect::IdleEnded);
                 }
+                effects.extend(self.count_rest(config));
                 if self.last_status != TimerStatus::BreakDue {
-                    return Vec::new();
+                    return effects;
                 }
                 match config.notice {
-                    NoticeKind::Lock => self.start_break(config, now, 0),
+                    NoticeKind::Lock => effects.extend(self.start_break(config, now, 0)),
                     NoticeKind::Notification => {
                         self.restart_interval(config);
-                        vec![Effect::ShowNotification]
+                        effects.push(Effect::ShowNotification);
                     }
                 }
+                effects
             }
         }
     }
@@ -306,6 +309,17 @@ impl Engine {
             postpones_used,
         };
         vec![Effect::BreakStarted]
+    }
+
+    /// Time away from the computer (sleep, locked session, idle pause) at
+    /// least as long as a break counts as one: the cancels start over.
+    fn count_rest(&mut self, config: &Config) -> Option<Effect> {
+        let rested = self.timer.take_rested_secs();
+        if rested < break_secs(config) || self.consecutive_cancels == 0 {
+            return None;
+        }
+        self.consecutive_cancels = 0;
+        Some(Effect::CancelCountChanged(0))
     }
 
     fn complete_break(&mut self, config: &Config) -> Vec<Effect> {
@@ -692,6 +706,110 @@ mod tests {
             assert!(!view(&e, &c, &clock).unwrap().can_finish, "{percent}");
             assert_eq!(e.finish(&c, clock.now()), vec![], "{percent}");
         }
+    }
+
+    /// Two cancels with a limit of two: the next break would be hard.
+    fn at_the_cancel_limit() -> (Config, Clock, Engine) {
+        let mut c = test_config();
+        c.breaks.limit_cancels = true;
+        c.breaks.cancel_limit = 2;
+        let mut clock = Clock::new();
+        let mut e = Engine::new(0);
+        for _ in 0..2 {
+            reach_break(&mut e, &c, &mut clock);
+            e.cancel(&c);
+        }
+        (c, clock, e)
+    }
+
+    #[test]
+    fn sleeping_at_least_a_break_resets_the_cancel_counter() {
+        // Reported bug: two cancels, hibernation overnight, and the first
+        // break of the next session was hard.
+        let (c, mut clock, mut e) = at_the_cancel_limit();
+        run(&mut e, &c, &mut clock, 10);
+        clock.jump(5 * MIN); // asleep for the length of a break
+
+        assert_eq!(
+            e.tick(&c, clock.now(), 0),
+            vec![Effect::CancelCountChanged(0)]
+        );
+        assert_eq!(e.consecutive_cancels(), 0);
+        reach_break(&mut e, &c, &mut clock);
+        assert!(!view(&e, &c, &clock).unwrap().hard);
+    }
+
+    #[test]
+    fn a_short_sleep_keeps_the_cancel_counter() {
+        let (c, mut clock, mut e) = at_the_cancel_limit();
+        run(&mut e, &c, &mut clock, 10);
+        clock.jump(5 * MIN - 1);
+
+        assert_eq!(e.tick(&c, clock.now(), 0), vec![]);
+        reach_break(&mut e, &c, &mut clock);
+        assert!(view(&e, &c, &clock).unwrap().hard);
+    }
+
+    #[test]
+    fn a_locked_session_of_at_least_a_break_resets_the_cancel_counter() {
+        let (c, mut clock, mut e) = at_the_cancel_limit();
+        e.on_session_lock();
+        run(&mut e, &c, &mut clock, 5 * MIN);
+        e.on_session_unlock();
+
+        assert_eq!(
+            e.tick(&c, clock.now(), 0),
+            vec![Effect::CancelCountChanged(0)]
+        );
+        reach_break(&mut e, &c, &mut clock);
+        assert!(!view(&e, &c, &clock).unwrap().hard);
+    }
+
+    #[test]
+    fn a_short_lock_keeps_the_cancel_counter() {
+        let (c, mut clock, mut e) = at_the_cancel_limit();
+        e.on_session_lock();
+        run(&mut e, &c, &mut clock, 2 * MIN);
+        e.on_session_unlock();
+
+        assert_eq!(e.tick(&c, clock.now(), 0), vec![]);
+        reach_break(&mut e, &c, &mut clock);
+        assert!(view(&e, &c, &clock).unwrap().hard);
+    }
+
+    #[test]
+    fn an_idle_pause_of_at_least_a_break_resets_the_cancel_counter() {
+        let (c, mut clock, mut e) = at_the_cancel_limit();
+        for idle in 1..=6 * MIN {
+            clock.jump(1);
+            e.tick(&c, clock.now(), idle);
+        }
+        clock.jump(1);
+
+        assert_eq!(
+            e.tick(&c, clock.now(), 0),
+            vec![Effect::IdleEnded, Effect::CancelCountChanged(0)]
+        );
+        reach_break(&mut e, &c, &mut clock);
+        assert!(!view(&e, &c, &clock).unwrap().hard);
+    }
+
+    #[test]
+    fn a_postponed_break_is_not_rest() {
+        let mut c = test_config();
+        c.breaks.limit_cancels = true;
+        c.breaks.cancel_limit = 2;
+        let mut clock = Clock::new();
+        let mut e = Engine::new(1);
+        reach_break(&mut e, &c, &mut clock);
+        e.postpone(&c, clock.now());
+        run(&mut e, &c, &mut clock, 5 * MIN); // the break comes back
+        e.cancel(&c);
+
+        let effects = run(&mut e, &c, &mut clock, 10);
+        assert!(!effects.contains(&Effect::CancelCountChanged(0)));
+        reach_break(&mut e, &c, &mut clock);
+        assert!(view(&e, &c, &clock).unwrap().hard);
     }
 
     #[test]

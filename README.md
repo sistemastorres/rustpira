@@ -20,7 +20,7 @@ Para que arranque con Windows, active **Iniciar con Windows** en la pestaña Gen
 | Inactividad | Si no usa el teclado ni el mouse durante unos minutos, el contador se detiene; al volver, empieza de cero y se avisa con una notificación. |
 | Cancelar y posponer | Se puede permitir cancelar el descanso, limitar las cancelaciones seguidas y posponerlo unos minutos, hasta 3 veces. |
 | Terminar descanso | Pasado un porcentaje del descanso (por defecto, 75 %; entre 50 y 100), el botón **Cancelar descanso** cambia a **Terminar descanso**, que lo cuenta como completo, y desaparece **Posponer**. Con 100 % no se ofrece. |
-| Descanso obligatorio | Al llegar al límite de cancelaciones, el siguiente descanso se muestra sin botones hasta que termina; tampoco ofrece **Terminar descanso**. |
+| Descanso obligatorio | Al llegar al límite de cancelaciones, el siguiente descanso se muestra sin botones hasta que termina; tampoco ofrece **Terminar descanso**. Las cancelaciones seguidas vuelven a cero al completar un descanso o al estar lejos de la computadora al menos lo que dura un descanso (suspensión, hibernación, sesión bloqueada o inactividad). |
 | Aspecto | Fondo de color o una imagen propia (PNG o JPG), con opacidad ajustable. Tema claro u oscuro para las ventanas. |
 | Sonido | Cuatro sonidos incluidos o un archivo `.wav` propio, con volumen. |
 

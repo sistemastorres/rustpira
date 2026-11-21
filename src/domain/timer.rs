@@ -53,6 +53,13 @@ pub struct WorkTimer {
     idle_paused: bool,
     locked: bool,
     disabled: Option<DisabledUntil>,
+    /// When the current locked period began.
+    locked_since: Option<u64>,
+    /// Longest idle time seen during the current idle pause.
+    idle_seen_secs: u64,
+    /// Longest rest away from the computer (sleep, locked session, idle
+    /// pause) that ended since the last `take_rested_secs`.
+    rested_secs: u64,
 }
 
 impl WorkTimer {
@@ -67,6 +74,8 @@ impl WorkTimer {
         };
         self.last_tick = Some(now.mono_secs);
         if delta > MAX_TICK_GAP_SECS {
+            // The machine slept or hibernated: that time was rest.
+            self.rested_secs = self.rested_secs.max(delta);
             self.elapsed_secs = 0;
             delta = 0;
         }
@@ -83,7 +92,11 @@ impl WorkTimer {
         }
 
         if self.locked {
+            self.locked_since.get_or_insert(now.mono_secs);
             return TimerStatus::Locked;
+        }
+        if let Some(since) = self.locked_since.take() {
+            self.rested_secs = self.rested_secs.max(now.mono_secs.saturating_sub(since));
         }
 
         let in_hours = config
@@ -103,10 +116,14 @@ impl WorkTimer {
 
         if config.idle.enabled && idle_secs >= u64::from(config.idle.minutes) * 60 {
             self.idle_paused = true;
+            self.idle_seen_secs = self.idle_seen_secs.max(idle_secs);
             return TimerStatus::IdlePaused;
         }
         if self.idle_paused {
             self.idle_paused = false;
+            self.rested_secs = self
+                .rested_secs
+                .max(std::mem::take(&mut self.idle_seen_secs));
             self.elapsed_secs = 0;
             delta = 0;
         }
@@ -124,8 +141,17 @@ impl WorkTimer {
 
     /// Starts counting the interval from zero (after a break, a cancel, or a
     /// configuration change).
+    /// Time spent on the break screen or postponed is not counted again as
+    /// a gap between ticks.
     pub fn restart(&mut self) {
         self.elapsed_secs = 0;
+        self.last_tick = None;
+    }
+
+    /// The longest rest that ended since the last call, in seconds; 0 if
+    /// none.
+    pub fn take_rested_secs(&mut self) -> u64 {
+        std::mem::take(&mut self.rested_secs)
     }
 
     /// "Desactivar recordatorios": stop counting for `minutes`.
@@ -137,6 +163,8 @@ impl WorkTimer {
             mono_secs: now.mono_secs + u64::from(minutes) * 60,
             label,
         });
+        // A postponed break may have stopped the ticks; that was not rest.
+        self.last_tick = None;
     }
 
     /// Whether a "Desactivar recordatorios" period is still running.
