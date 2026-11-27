@@ -39,8 +39,8 @@ struct App {
 }
 
 /// Shows a Windows notification; if that is not possible, logs the text.
-fn notify_or_log(title: &str, message: &str) {
-    if !notify::show(title, message) {
+fn notify_or_log(title: &str, message: &str, sound: notify::Sound) {
+    if !notify::show(title, message, sound) {
         eprintln!("[rustpira] no se pudo mostrar la notificación: {title}: {message}");
     }
 }
@@ -85,7 +85,11 @@ pub fn run() -> Result<(), Box<dyn Error>> {
     if let Some(warning) = loaded.warning {
         // Give the tray icon a moment to register before notifying.
         slint::Timer::single_shot(Duration::from_secs(1), move || {
-            notify_or_log("Rustpira: configuración", &warning.to_string());
+            notify_or_log(
+                "Rustpira: configuración",
+                &warning.to_string(),
+                notify::Sound::Silent,
+            );
         });
     }
 
@@ -292,11 +296,17 @@ impl App {
                         &format!(
                             "Se detectó actividad otra vez. El contador volvió a empezar: el próximo descanso es en {minutes} min."
                         ),
+                        // Informational: the break sound would sound like a break.
+                        notify::Sound::Windows,
                     );
                 }
                 Effect::ShowNotification => {
                     let config = self.config.borrow();
-                    notify_or_log(&config.message.title, &config.message.body);
+                    notify_or_log(
+                        &config.message.title,
+                        &config.message.body,
+                        notify::Sound::Silent,
+                    );
                     self.player.play(&config.sound);
                 }
             }

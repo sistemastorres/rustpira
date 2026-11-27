@@ -47,9 +47,26 @@ pub fn fixed_wide<const N: usize>(text: &str) -> [u16; N] {
     buffer
 }
 
+/// Whether Windows plays its own notification sound.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Sound {
+    /// No system sound: the app plays its configured one with its volume.
+    Silent,
+    /// The system notification sound, following the user's Windows settings.
+    Windows,
+}
+
+/// The balloon flags for `sound`.
+pub fn info_flags(sound: Sound) -> u32 {
+    match sound {
+        Sound::Silent => NIIF_NOSOUND,
+        Sound::Windows => 0,
+    }
+}
+
 /// Shows `title` and `message` as a Windows notification. `false` if the
 /// tray icon could not be found or Windows refused.
-pub fn show(title: &str, message: &str) -> bool {
+pub fn show(title: &str, message: &str, sound: Sound) -> bool {
     let Some(window) = tray_window() else {
         return false;
     };
@@ -61,8 +78,7 @@ pub fn show(title: &str, message: &str) -> bool {
     data.uFlags = NIF_INFO;
     data.szInfoTitle = fixed_wide(title);
     data.szInfo = fixed_wide(message);
-    // The app plays its own sound with the configured volume.
-    data.dwInfoFlags = NIIF_NOSOUND;
+    data.dwInfoFlags = info_flags(sound);
     // SAFETY: `data` is fully initialized and identifies an existing icon.
     unsafe { Shell_NotifyIconW(NIM_MODIFY, &data) != 0 }
 }
@@ -96,6 +112,16 @@ mod tests {
     fn text(buffer: &[u16]) -> String {
         let end = buffer.iter().position(|c| *c == 0).unwrap();
         String::from_utf16(&buffer[..end]).unwrap()
+    }
+
+    #[test]
+    fn a_silent_notification_asks_windows_for_no_sound() {
+        assert_eq!(info_flags(Sound::Silent), NIIF_NOSOUND);
+    }
+
+    #[test]
+    fn a_windows_sound_notification_keeps_the_system_sound() {
+        assert_eq!(info_flags(Sound::Windows) & NIIF_NOSOUND, 0);
     }
 
     #[test]
